@@ -1,0 +1,139 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１０８．壁回避ステアリング</h3>
+<h4>壁回避とは</h4>
+　たとえば<b>チュートリアル008</b>で紹介した、スクエアを使った壁は、プレイヤーが衝突すると跳ね返ります。<br />
+　ステージ中に、<b>これ以上先に行けない壁</b>を設ける場合、<b>チュートリアル008の方法</b>を使うのもいいですが、それが<b>見えない壁</b>だった場合、そこで予期せずに反発してしまうため、ユーザーが戸惑う場合があります。<br />
+　そんな時、<b>ある程度遊びを持たせながら、その先には行けない壁</b>を作ることができれば、プレイ中も違和感なく、<b>ああこの先はいけないようになってるんだな</b>と思わせることができます。<br />
+　<b>Sample108</b>はそんな、<b>遊びを持たせながら、その先はいけない壁</b>を実装しています。<br />
+　<b>Sample108</b>ソリューションを開いて、リビルド、実行すると以下のような画面が出てきます。
+<p>&nbsp;</p>
+<img src="img/1008a.jpg" width="80%"/>
+<p>図1008a</p>
+<p>&nbsp;</p>
+　ここで、プレイヤーを動かして、壁模様の外に出てみましょう。<br />
+　途中まではオブジェクトがついてきますが、壁模様の外に出ようとすると、引き戻されてしまいます。<br />
+　その動きが、まるで、<b>あわてて引き返す</b>のような動きになります。<br />
+　これは、今までも幾度となく出てきた<b>SeekObjectクラス</b>を若干修正して実装しています。<br />
+　以下は、<b>SeekObjectクラスのOnCreate()関数</b>です。修正点だけピックアップします。
+<div class="box1">
+<pre>
+    //初期化
+    void SeekObject::OnCreate(){
+        //中略
+
+        //操舵系のコンポーネントをつける場合はRigidbodyをつける
+        auto PtrRegid = AddComponent&lt;Rigidbody>();
+
+        //壁を作成（時計回りの3点で定義する面）
+        vector&lt;Plane> PlaneVec;
+        PlaneVec.push_back(Plane(Vector3(0, 0, 20.0f), 
+            Vector3(0, 10.0f, 20.0f), Vector3(10.0f, 0, 20.0f)));
+        PlaneVec.push_back(Plane(Vector3(-20.0f, 0, 0), 
+            Vector3(-20.0f, 10.0f, 0), Vector3(-20.0f, 0, 10.0f)));
+        PlaneVec.push_back(Plane(Vector3(20.0f, 0, 0), 
+            Vector3(20.0f, 10.0f, 0), Vector3(20.0f, 0, -10.0f)));
+        PlaneVec.push_back(Plane(Vector3(0, 0, -20.0f), 
+            Vector3(0, 10.0f, -20.0f), Vector3(-10.0f, 0, -20.0f)));
+        <span class="red">//壁回避をつける
+        auto WallAvoidancePtr = AddComponent&lt;WallAvoidanceSteering>();
+        WallAvoidancePtr->SetPlaneVec(PlaneVec);</span>
+
+        //Seek操舵
+        auto PtrSeek = AddComponent&lt;SeekSteering>();
+        //Arrive操舵
+        auto PtrArrive = AddComponent&lt;ArriveSteering>();
+        //Arriveは無効にしておく
+        PtrArrive->SetUpdateActive(false);
+
+        //オブジェクトのグループを得る
+        auto Group = GetStage()->GetSharedObjectGroup(L"ObjectGroup");
+        //グループに自分自身を追加
+        Group->IntoGroup(GetThis&lt;SeekObject>());
+        //分離行動をつける
+        AddComponent&lt;SeparationSteering>(Group);
+        //Obbの衝突判定をつける
+        auto PtrColl = AddComponent&lt;CollisionObb>();
+
+        //中略
+    }
+</pre>
+</div>
+　このように、<b>WallAvoidanceSteeringコンポーネント</b>を追加します。<br />
+　<b>WallAvoidanceSteeringコンポーネント</b>は、面を登録して、その先に行くと引き戻す操舵が働きます。<br />
+<br />
+　しかし、これだけでは不十分です。<b>WallAvoidanceSteeringコンポーネント</b>は毎ターンごとに、面とオブジェクトの関係を検証し、面より奥に行っていたら、フォースをを発生させるわけですが、SeekObjectには、このほかに、<b>SeekSteeringとArriveSteering</b>というプレイヤーを追いかける操舵を持ってますので（実装されるのは、ステートによってどちらか振り分けられますが）、これらが、<b>WallAvoidanceSteeringコンポーネント</b>が引き戻そうとする動きを相殺してしまいます。<br />
+　そのため<b>WallAvoidanceSteeringコンポーネント</b>が働いてる間は、この両者の操舵を止めます。<br />
+　そのコードは以下です、<b>SeekObject::ChangeSteering()</b>に記述します（新たに定義します）。
+<div class="box1">
+<pre>
+    //操舵を変更する
+    void SeekObject::ChangeSteering(){
+        //壁の奥にいっていたら、他の操舵は無効とする
+        auto WallAvoidancePtr = GetComponent&lt;WallAvoidanceSteering>();
+        if (WallAvoidancePtr->IsWallArribed()){
+            auto PtrSeek = GetComponent&lt;SeekSteering>();
+            PtrSeek->SetUpdateActive(false);
+            auto PtrArrive = GetComponent&lt;ArriveSteering>();
+            PtrArrive->SetUpdateActive(false);
+        }
+        else{
+            //奥にいってなかったら本来の操舵を戻す
+            if (m_StateMachine->GetCurrentState() == FarState::Instance()){
+                auto PtrSeek = GetComponent&lt;SeekSteering>();
+                PtrSeek->SetUpdateActive(true);
+            }
+            else if (m_StateMachine->GetCurrentState() == NearState::Instance()){
+                auto PtrArrive = GetComponent&lt;ArriveSteering>();
+                PtrArrive->SetUpdateActive(true);
+            }
+        }
+    }
+</pre>
+</div>
+　そしてこの関数を、<b>SeekObject::OnLastUpdate()関数</b>から呼びます。<br />
+<div class="box1">
+<pre>
+    void SeekObject::OnLastUpdate(){
+        //操舵を変更する
+        ChangeSteering();
+        //中略
+    }
+</pre>
+</div>
+
+
+　このように、<b>WallAvoidanceSteeringコンポーネント</b>は、<b>壁の奥に行っていたらtrueを返す、IsWallArribed()関数</b>を持っていますので、その内容によって、<b>SeekSteeringとArriveSteering</b>を止めたり、壁から手前に来たらアクティブにしたり操作します。ステートで管理されているので、現在のステートによって、アクティブにするコンポーネントを振り分けます。<br />
+　SeekObjectにはこのほかに、<b>分離行動</b>をする、<b>SeparationSteeringステアリング</b>が実装されてますが。こちらは、プレイヤーに影響されませんので、止めなくても問題ありません。<br />
+　また、今回の動作は<b>WallAvoidanceSteering</b>の実装をステートを使って実装することも可能です。各自検討してみましょう。
+<br/>
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_07.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="10_09.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

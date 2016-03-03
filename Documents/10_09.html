@@ -1,0 +1,128 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１０９．経路巡回ステアリング</h3>
+<h4>経路巡回とは</h4>
+　AI動作の基本として、たとえば敵キャラがある一定の経路を巡回しつつ、プレイヤーが現れたら近づいてきて攻撃する、のような動きを実装したい場合があります。<br />
+　<b>Sample109</b>はそんな要求にこたえるサンプルです。<br />
+　<b>Sample109</b>ソリューションを開いて、リビルド、実行すると以下のような画面が出てきます。
+<p>&nbsp;</p>
+<img src="img/1009a.jpg" width="80%"/>
+<p>図1009a</p>
+<p>&nbsp;</p>
+　この画面では、いつものオブジェクトが、壁模様の各頂点を、たすき掛けするように巡回します。<br />
+　しかし、プレイヤーが近づくと巡回を一旦停止し、プレイヤーによってきます。いわば、道草を食うようなイメージです。そして、プレイヤーが離れるとまた、元の巡回に戻ります。<br />
+　このサンプルは、<b>チュートリアル007</b>を修正して作成してます。<br />
+　<b>チュートリアル007のSeekObject</b>には、<b>SeekSteeringとArriveSteering</b>という2つの操舵が実装されていましたが、このサンプルでは、<b>SeekSteeringの代わりにFollowPathSteering</b>という操舵を実装します。<br />
+　以下は、<b>SeekObjectのOnCreate()関数</b>です。<br />
+　重要な部分のみ、ピックアップします。
+<div class="box1">
+<pre>
+    //初期化
+    void SeekObject::OnCreate(){
+        //中略
+
+        //操舵系のコンポーネントをつける場合はRigidbodyをつける
+        auto PtrRegid = AddComponent&lt;Rigidbody>();
+        //FollowPath操舵
+        auto PtrFollowPath = AddComponent&lt;FollowPathSteering>();
+        //経路を設定する
+        list&lt;Vector3> List;
+        List.push_back(Vector3(20.0f, 0.125f, 20.0f));
+        List.push_back(Vector3(-20.0f, 0.125f, -20.0f));
+        List.push_back(Vector3(-20.0f, 0.125f, 20.0f));
+        List.push_back(Vector3(20.0f, 0.125f, -20.0f));
+        PtrFollowPath->SetPathList(List);
+        //ループする
+        PtrFollowPath->SetLooped(true);
+
+        //Arrive操舵
+        auto PtrArrive = AddComponent&lt;ArriveSteering>();
+        //Arriveは無効にしておく
+        PtrArrive->SetUpdateActive(false);
+
+        //オブジェクトのグループを得る
+        auto Group = GetStage()->GetSharedObjectGroup(L"ObjectGroup");
+        //グループに自分自身を追加
+        Group->IntoGroup(GetThis&lt;SeekObject>());
+        //分離行動をつける
+        AddComponent&lt;SeparationSteering>(Group);
+
+        //中略
+    }
+</pre>
+</div>
+　このように、<b>SeekSteering</b>をつけずに<b>FollowPathSteering</b>をつけています。<br/>
+　<b>ArriveSteeringとSeparationSteering</b>はそのままです。<br />
+<br />
+<h4>モーション関数の変更</h4>
+　<b>SeekSteering</b>用に作成してあったモーション関数群を、<b>FollowPathSteering</b>用に差し替えます。以下は、<b>FollowPathSteering</b>用モーション関数の実体です。ヘッダファイルにすでに宣言されているものとします。
+<div class="box1">
+<pre>
+    void  SeekObject::FollowPathStartMoton(){
+        auto PtrFollowPath = GetComponent&lt;FollowPathSteering>();
+        PtrFollowPath->SetUpdateActive(true);
+    }
+    bool  SeekObject::FollowPathUpdateMoton(){
+        if (GetPlayerLength() &lt;= m_StateChangeSize){
+            //プレイヤーとの距離が一定以以下ならtrue
+            return true;
+        }
+        return false;
+    }
+    void  SeekObject::FollowPathEndMoton(){
+        auto PtrFollowPath = GetComponent&lt;FollowPathSteering>();
+        PtrFollowPath->SetUpdateActive(false);
+    }
+</pre>
+</div>
+　そして、<b>SeekSteering</b>用に作成してあったステート（すなわち、<b>FarState</b>）の各仮想関数を以下のように書き換えます。
+<div class="box1">
+<pre>
+    void FarState::Enter(const shared_ptr&lt;SeekObject>& Obj){
+        Obj->FollowPathStartMoton();
+    }
+    void FarState::Execute(const shared_ptr&lt;SeekObject>& Obj){
+        if (Obj->FollowPathUpdateMoton()){
+            Obj->GetStateMachine()->ChangeState(NearState::Instance());
+        }
+    }
+    void FarState::Exit(const shared_ptr&lt;SeekObject>& Obj){
+        Obj->FollowPathEndMoton();
+    }
+</pre>
+</div>
+　こうすると、以前、<b>SeekSteering</b>が実装されていた部分に、<b>FollowPathSteering</b>が実装されるようになります。<br />
+<br />
+　今回紹介したAI動作は、比較的単純な動きをする敵キャラなどに向いてます。もっと複雑な（たとえば、パス検索）動きを実装するためには、探索ロジックを使用する必要があります。
+
+<br/>
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_08.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="10_10.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
