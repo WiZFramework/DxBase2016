@@ -1,0 +1,128 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2015ドキュメント(2015年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１０５．砲弾などの動的な追加</h3>
+<h4>使いまわしをするオブジェクト</h4>
+　前項では、単純にオブジェクトの動的な追加を実装しました。<br />
+　この項では、砲弾や弾丸など、表示しては消えるオブジェクトの追加を実装します。<br />
+　ただし、パーティクルエフェクトはこの方法はとりません。エフェクトについては後ほどのサンプルで紹介します。<br />
+　<b>Sample105ディレクトリ</b>のソリューションを開いてリビルド、実行すると、以下のような画面が出てきます。<br />
+　Bボタンを押すと、砲弾が発射され地面で爆発します。
+<p>&nbsp;</p>
+<img src="img/1005a.jpg" width="80%"/>
+<p>図1005a</p>
+<p>&nbsp;</p>
+　左上の<b>砲弾グループの砲弾数</b>に注目してください。<br />
+　砲弾を連射した場合、ある一定までは数が増えますが、それ以上は増えません。これは、使い終わった（爆発後すでに消えてしまった）砲弾オブジェクトを使いまわしているのです。<br />
+　こうしておけば、どんなに連射しても、画面上に表示されている数以上にはなりません。100発撃とうが1000発撃とうが、メモリはある一定以上は増えないのです。<br />
+<br/>
+<h4>Refresh()関数</h4>
+　使いまわしをするクラスを作成するには、まず再初期化をする関数を用意します。通常は、コンストラクタと同じ引数（Stageのポインタは必要ない）で作成します。<br />
+　以下は砲弾クラスである、<b>ShellBallクラス</b>の<b>Refresh()関数</b>です。
+<div class="box1">
+<pre>
+    void ShellBall::Refresh(const Vector3& StartPos, const Vector3& JumpVec){
+        SetUpdateActive(true);
+        SetDrawActive(true);
+        m_StartPos = StartPos;
+        m_JumpVec = JumpVec;
+        //Transform取得
+        auto Ptr = GetComponent&lt;Transform>();
+        Ptr->SetScale(m_NowScale);
+        Ptr->SetPosition(m_StartPos);
+        //描画コンポーネント
+        auto PtrDraw = GetComponent&lt;PNTStaticDraw>();
+        PtrDraw->SetDiffuse(Color4(1.0f, 1.0f, 0, 1.0f));
+        //重力を取り出す
+        auto PtrGravity = GetComponent&lt;Gravity>();
+        //ジャンプスタート
+        PtrGravity->StartJump(m_JumpVec);
+
+        //今のステートをFiringStateに設定
+        m_StateMachine->SetCurrentState(FiringState::Instance());
+        //FiringStateの初期化実行を行う
+        m_StateMachine->GetCurrentState()->Enter(GetThis&lt;ShellBall>());
+
+    }
+</pre>
+</div>
+　内容を見ればわかるように、主に<b>コンストラクタとCreate()関数</b>で行う処理を記述します。ステートも発射時のステートにします。<br />
+<br />
+<h4>追加か使いまわしか</h4>
+　この関数を呼び出すのは、プレイヤー側です。プレイヤーは、砲弾グループ内の配列をスキャンして、もし<b>UpdateActiveとDrawActiveがfalseのオブジェクト（つまり無効のオブジェクトがあれば）</b>そのオブジェクトの<b>Refresh()関数</b>を呼び出します。<br />
+　もし、空いてるオブジェクトがなければ、前項のように<b>AddGameObject()テンプレート関数</b>を呼び出します。<br />
+　その処理を行っているのが<b>Player::ShellThrowMotion()関数</b>です。<br />
+　以下がその実体です。
+<div class="box1">
+<pre>
+    //Bボタンで砲弾を発射する処理
+    void Player::ShellThrowMotion(){
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        Vector3 Angle = GetAngle();
+        //砲弾の追加
+        auto PtrTrans = GetComponent&lt;Transform>();
+        //プレイヤーの向きを得る
+        auto PlayerAngle = PtrTrans->GetRotation();
+        Vector3 ShellSpeed(sin(PlayerAngle.y), 0, cos(PlayerAngle.y));
+        ShellSpeed *= 10.0f;
+        Vector3 Velo = GetComponent&lt;Rigidbody>()->GetVelocity();
+        Velo.y = 0;
+        //移動スピードを加算
+        ShellSpeed += Velo;
+        //打ち上げの上向きの初速度を追加（値は固定）
+        ShellSpeed += Vector3(0.0f, 6.0f, 0);
+        //グループ内に空きがあればそのオブジェクトを再利用
+        //そうでなければ新規に作成
+        auto Group = GetStage()->GetSharedObjectGroup(L"ShellBallGroup");
+        auto ShellVec = Group->GetGroupVector();
+        for (auto Ptr : ShellVec){
+            //Ptrはweak_ptrなので有効性チェックが必要
+            if (!Ptr.expired()){
+                auto ShellPtr = dynamic_pointer_cast&lt;ShellBall>(Ptr.lock());
+                if (ShellPtr){
+                    if ((!ShellPtr->IsUpdateActive()) && (!ShellPtr->IsDrawActive())){
+                        <span class="red">ShellPtr->Refresh(PtrTrans->GetPosition(), ShellSpeed);</span>
+                        return;
+                    }
+                }
+            }
+        }
+        //ここまで来たら空きがなかったことになる
+        //砲弾の追加
+        <span class="red">auto Sh = GetStage()->AddGameObject&lt;ShellBall>(PtrTrans->GetPosition(), ShellSpeed);</span>
+        //グループに追加
+        Group->IntoGroup(Sh);
+    }
+</pre>
+</div>
+　赤くなっているところが、使いまわしもしくは追加するところです。
+
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_04.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="10_06.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
