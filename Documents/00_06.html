@@ -1,0 +1,540 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>０．チュートリアル</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<h3>００６．ステートと速度を調整するプレイヤー</h3>
+<br />
+<h4>速度を指定する</h4>
+　前項では、<b>Rigidbodyコンポーネント</b>による自動反発を実装してみました。<br />
+　それでは、コントローラなどで動かす<b>プレイヤー</b>に自動反発を実装するためにはどうすればいいでしょうか？<br />
+　<b>Tutorial006</b>には、そんなプレイヤーの例を紹介しています。<br />
+　<b>Tutorial006</b>ディレクトリ内のソリューションを開くと以下のような画面が現れます。コントローラーの左スティックを動かすと、プレイヤーが移動します。<br />
+　右スティックでカメラを調整できます。左十字キーでカメラのズームインアウトができます。カメラは前項と同じカメラですが、プレイヤーを追いかけるように設定してあります。
+<br />
+<p>&nbsp;</p>
+<img src="img/0006a.jpg" width="80%"/>
+<p>図0006a</p>
+<p>&nbsp;</p>
+<br/>
+<h4>プレイヤーの操作</h4>
+　プレイヤーはAボタンでジャンプできます。いくつか障害物がありますが、その上に乗ることもできます、斜めの障害物に乗ろうとすると、重力の影響で滑り台のようになります。後方の上下に動くボックスに乗ると、そのまま上下移動します。<br />
+　障害物に激突すると、そのまま反発が働きます。移動中にコントローラを離しても、ピタッとは止まらず、少し慣性で移動します。<br />
+<br />
+<h4>プレイヤーのヘッダ</h4>
+　このサンプルでは、プレイヤーの動きが重要です。<br />
+　まず、<b>Player.h</b>を見てみましょう。
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class Player : public GameObject;
+    //  用途: プレイヤー
+    //--------------------------------------------------------------------------------------
+    class Player : public GameObject{
+        <span class="red">shared_ptr&lt; StateMachine&lt;Player> >  m_StateMachine; //ステートマシーン</span>
+        //移動の向きを得る
+        Vector3 GetAngle();
+        //最高速度
+        float m_MaxSpeed;
+        //減速率
+        float m_Decel;
+        //質量
+        float m_Mass;
+    public:
+        //中略
+
+        //初期化
+        virtual void OnCreate() override;
+        //アクセサ
+        shared_ptr&lt; StateMachine&lt;Player> > GetStateMachine() const{
+            return m_StateMachine;
+        }
+        //モーションを実装する関数群
+        //移動して向きを移動方向にする
+        void MoveRotationMotion();
+
+        //Aボタンでジャンプするどうかを得る
+        bool IsJumpMotion();
+        //Aボタンでジャンプする瞬間の処理
+        void JumpMotion();
+        //Aボタンでジャンプしている間の処理
+        //ジャンプ終了したらtrueを返す
+        bool JumpMoveMotion();
+
+        //中略
+    };
+</pre>
+</div>
+　上記は、<b>Playerクラスの宣言の抜粋</b>です。重要な部分は残してあります。コンストラクタなどは省略しています。<br />
+　ここで、初めて見る
+<div class="box1">
+<pre>
+        <span class="red">shared_ptr&lt; StateMachine&lt;Player> >  m_StateMachine; //ステートマシーン</span>
+</pre>
+</div>
+　という変数があります。これは、<b>ステートマシン</b>といって、この項で説明する<b>ステート</b>を実装するために重要な変数です。<br />
+　また、
+<div class="box1">
+<pre>
+        //モーションを実装する関数群
+        //移動して向きを移動方向にする
+        void MoveRotationMotion();
+
+        //Aボタンでジャンプするどうかを得る
+        bool IsJumpMotion();
+        //Aボタンでジャンプする瞬間の処理
+        void JumpMotion();
+        //Aボタンでジャンプしている間の処理
+        //ジャンプ終了したらtrueを返す
+        bool JumpMoveMotion();
+</pre>
+</div>
+　などは、プレイヤーの1つ1つの動きを小分けにした関数です。便宜上<b>モーション関数</b>と呼びます。<br />
+　参考書によっては<b>ふるまい記述関数</b>などと呼ぶこともあります。<br />
+　これらの関数は、<b>ステート</b>を実装するために重要な関数群です。<br />
+<br/>
+　それではまず<b>ステートとは何か</b>から述べていきます。<br />
+<br />
+<h4>ステート</h4>
+　<b>オブジェクト（プレイヤーであれ、敵キャラであれ、ゲーム盤上に配置されるオブジェクト）</b>は、他のオブジェクトとまったくかかわりあわない限り、<b>状態</b>というのを持ってます。<br />
+　たとえば、<b>ジャンプしている状態、敵にやられて無敵状態になってる、ダメージを受けて倒れる、剣を持って攻撃する</b>などなどです。<br />
+　通常は、このような<b>状態</b>を、<b>Update系の関数</b>で振り分けて、<b>状態</b>に合わせた計算（動き）を実装します。<br />
+　状態の振り分けが数種類ならいいのですが、最近ではキャラクターの動きが複雑化しているため、多いときは10種類以上の状態を振り分けなければなりません。<br />
+　そのうえ、各<b>状態</b>は、複合的に組み合わさったりします。<br />
+　考えを単純にするために、あるオブジェクトの状態が、<b>Ａ、Ｂ、Ｃ、Ｄ</b>の4種類あったとします。<br />
+　そして、実装すべき動きが、<b>１、２、３、４、５</b>の種類あったとします。<br />
+　<b>Ａの状態のときは１，２</b>を実装します。<b>Ｂの状態のときは１，３、５</b>を実装します。そのようにして、以下のような組み合わせを考えてみましょう。
+<div class="box1">
+<pre>
+Ａ・・・・・１、２
+Ｂ・・・・・１、３、５
+Ｃ・・・・・２，３
+Ｄ・・・・・２、４
+</pre>
+</div>
+　このような実装をする場合、<b>if文やswitch文</b>で振り分けていたのでは、大変なことになります。そのうえ、バグも生みやすい（すべての条件を実装したつもりが、<b>抜け</b>、ができてしまう）こともたびたびあります。<br />
+　そんな悩みを一気に解決してくれるのが、<b>ステート</b>です。<br />
+　上記の場合、<b>Ａ、Ｂ、Ｃ、Ｄ</b>はそれぞれ<b>ステート</b>になります。そして、<b>１、２、３、４、５</b>は、オブジェクトクラスのメンバ関数などで用意する、ステートから呼び出される前提の関数群です。さきほど<b>モーション関数</b>と呼んだ関数群がこれらの関数です。<br />
+　<b>ステート</b>の強さはそれだけではありません。<b>条件によって次のステート</b>移ることも行うのです。<br />
+<br />
+　<b>ステート</b>は<b>DxBase2016特有の実装ではなく</b>、古くからある有名なアルゴリズムです。各書籍などでも解説されています。<br/>
+　<b>DxBase2016</b>はステートを実装しやすいように、2つのクラスがあります。<br />
+　<b>ObjState</b>という、各ステートの親クラスに位置する<b>テンプレートクラス</b>と、<b>StateMachine（ステートマシン）</b>という<b>テンプレートクラス</b>です。ステートマシンは派生クラスを作らずに、そのままインスタンスを配置します。<br/>
+<br />
+　以下は、<b>Player.h</b>で宣言されている、<b>プレイヤーが持っている2つのステートクラス</b>です。<br/>
+　<b>ObjState</b>の派生クラスとして作成します。
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class DefaultState : public ObjState&lt;Player>;
+    //  用途: 通常移動
+    //--------------------------------------------------------------------------------------
+    class DefaultState : public ObjState&lt;Player>
+    {
+        DefaultState(){}
+    public:
+        //ステートのインスタンス取得
+        static shared_ptr&lt;DefaultState> Instance();
+        //ステートに入ったときに呼ばれる関数
+        virtual void Enter(const shared_ptr&lt;Player>& Obj)override;
+        //ステート実行中に毎ターン呼ばれる関数
+        virtual void Execute(const shared_ptr&lt;Player>& Obj)override;
+        //ステートにから抜けるときに呼ばれる関数
+        virtual void Exit(const shared_ptr&lt;Player>& Obj)override;
+    };
+
+    //--------------------------------------------------------------------------------------
+    //  class JumpState : public ObjState&lt;Player>;
+    //  用途: ジャンプ状態
+    //--------------------------------------------------------------------------------------
+    class JumpState : public ObjState&lt;Player>
+    {
+        JumpState(){}
+    public:
+        //ステートのインスタンス取得
+        static shared_ptr&lt;JumpState> Instance();
+        //ステートに入ったときに呼ばれる関数
+        virtual void Enter(const shared_ptr&lt;Player>& Obj)override;
+        //ステート実行中に毎ターン呼ばれる関数
+        virtual void Execute(const shared_ptr&lt;Player>& Obj)override;
+        //ステートにから抜けるときに呼ばれる関数
+        virtual void Exit(const shared_ptr&lt;Player>& Obj)override;
+    };
+</pre>
+</div>
+　ここに登場する、<b>DefaultStateとJumpState</b>はいずれも、プレイヤーに結び付けられるステートです。ですから、宣言にも<b>Player</b>を指定する箇所があります。<br />
+<div class="box1">
+<pre>
+class DefaultState : public ObjState&lt;Player>
+{...
+</pre>
+</div>
+　こんな感じです。<br />
+　そして<b>ステートのコンストラクタ</b>はかならず<b>privateメンバ</b>にします。<br />
+　クラス宣言は、何もアクセス指定しなければデフォルトで<b>privateメンバ</b>になります。<br />
+　これは、<b>ステートはシングルトンとして作成する</b>からです。<b>シングルトン</b>というのは<b>このアプリケーション中、ただ一つしかインスタンスが存在しないクラス</b>です。<br/>
+　たとえば、あるゲームオブジェクトクラスが5個のステートを持っていたとします。そしてゲーム画面に100個のインスタンスが配置されたとすると、ステートだけで500個のインスタンスができることになります。<br />
+　メモリ効率的にも望ましくありません。ですから<b>同じクラスのすべてのインスタンス</b>が<b>同じステートのインスタンス</b>にアクセスする必要があります。<br />
+　そのため、<b>ステートにはメンバ変数は置きません</b>。
+<br/>
+　コンストラクタが<b>privateメンバ</b>ということは、外部からは構築不可能になるので、何らかの形でシングルトンのインスタンスを取得しなければなりません。それが
+<div class="box1">
+<pre>
+    static shared_ptr&lt;DefaultState> Instance();
+</pre>
+</div>
+　です。このstatic関数で、シングルトンのポインタを取得します。<br />
+<br/>
+　また、<b>ステートは以下の3つの仮想関数</b>を必ず持ちます。
+<div class="box1">
+<pre>
+    virtual void Enter(const shared_ptr&lt;Player>& Obj)override;
+    virtual void Execute(const shared_ptr&lt;Player>& Obj)override;
+    virtual void Exit(const shared_ptr&lt;Player>& Obj)override;
+</pre>
+</div>
+　これはコメントにあるように、<br />
+<div class="box1">
+<pre>
+そのステートに入ったとき（Enter()関数）
+そのステートで実行中（Execute()関数）
+そのステートから抜けるとき（Exit()関数）
+</pre>
+</div>
+　に呼ばれます。<br/>
+<br />
+　また、プレイヤーには、
+<div class="box1">
+<pre>
+        <span class="red">shared_ptr&lt; StateMachine&lt;Player> >  m_StateMachine; //ステートマシーン</span>
+</pre>
+</div>
+　というメンバがあるのは先に紹介しました。これが<b>ステートマシン</b>です。ステートのマネージャ的な存在です。<br />
+　ステートを使う場合は、かならずメンバに保持しておきます。テンプレートクラスなので、保持するクラスを記述しなければなりません。<br />
+<br />
+<h4>プレイヤーの実体とデフォルトステート</h4>
+　プレイヤーの実体は<b>Player.cpp</b>にコードがあります。<br/>
+　まず、ステートから見ていきましょう、以下は、通常状態のステート<b>DefaultState</b>の実体です。
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class DefaultState : public ObjState&lt;Player>;
+    //  用途: 通常移動
+    //--------------------------------------------------------------------------------------
+    //ステートのインスタンス取得
+    shared_ptr&lt;DefaultState> DefaultState::Instance(){
+        static shared_ptr&lt;DefaultState> instance;
+        if (!instance){
+            instance = shared_ptr&lt;DefaultState>(new DefaultState);
+        }
+        return instance;
+    }
+    //ステートに入ったときに呼ばれる関数
+    void DefaultState::Enter(const shared_ptr&lt;Player>& Obj){
+        //何もしない
+    }
+    //ステート実行中に毎ターン呼ばれる関数
+    void DefaultState::Execute(const shared_ptr&lt;Player>& Obj){
+        Obj->MoveRotationMotion();
+        if (Obj->IsJumpMotion()){
+            //Jumpボタンでステート変更
+            Obj->GetStateMachine()->ChangeState(JumpState::Instance());
+        }
+    }
+    //ステートにから抜けるときに呼ばれる関数
+    void DefaultState::Exit(const shared_ptr&lt;Player>& Obj){
+        //何もしない
+    }
+</pre>
+</div>
+　まず、<b>Instance()関数</b>では、<b>シングルトン</b>を実装するための記述があります。
+<div class="box1">
+<pre>
+    static shared_ptr&lt;DefaultState> instance;
+</pre>
+</div>
+　というのが<b>シングルトン</b>のポインタ(shared_ptr)です。<b>static変数</b>で、最初に呼ばれたときだけ<b>new</b>で初期化します。<br />
+　<b>DefaultState::Enter()とDefaultState::Exit()関数</b>は何もしない関数です。親クラス<b>ObjState</b>で<b>純粋仮想関数</b>として宣言されているので、何らかの実体は書く必要があります。ここでは空関数にしておきます。<br />
+　<b>DefaultState::Execute()関数</b>のみ実体に記述があります。ここではプレイヤー側の<b>モーション関数</b>を呼び出します。<br />
+　詳しくコメントすると
+<div class="box1">
+<pre>
+        //まず、移動と回転を行う関数を呼び出す
+        Obj->MoveRotationMotion();      
+        //もし、ジャンプが始まったら
+        if (Obj->IsJumpMotion()){
+            //ジャンプステートにステート変更
+            Obj->GetStateMachine()->ChangeState(JumpState::Instance());
+        }
+</pre>
+</div>
+　という実装があります。これは<br />
+<div class="box1">
+<pre>
+移動と回転を行う関数を呼び出す  ・・・・１
+ジャンプしてるかをチェックする関数を呼び出す・・・２
+２の結果によりステート変更する関数を呼び出す・・・３
+</pre>
+</div>
+　という３つのモーション関数を呼び出してます。３のみちょっとタイプが違いますが、ステートの変更はステート内から行って問題ありません。<br />
+　ここで注目したいのは、<b>移動と回転を行う関数を呼び出す   ・・・・１</b>は別のステート（つまり、この後説明するジャンプステート）からも呼び出されるということです。<br />
+　<b>モーション関数</b>は、いくつものステートから、別々に呼ばれてもいいように記述します。このため<b>モーション関数の実装</b>は、非常にコンパクトな、単一の処理を記述するような内容に書くべきです。<br />
+<br/>
+<h4>ジャンプステート</h4>
+　以下は、ジャンプステートの実体です。
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class JumpState : public ObjState&lt;Player>;
+    //  用途: ジャンプ状態
+    //--------------------------------------------------------------------------------------
+    //ステートのインスタンス取得
+    shared_ptr&lt;JumpState> JumpState::Instance(){
+        static shared_ptr&lt;JumpState> instance;
+        if (!instance){
+            instance = shared_ptr&lt;JumpState>(new JumpState);
+        }
+        return instance;
+    }
+    //ステートに入ったときに呼ばれる関数
+    void JumpState::Enter(const shared_ptr&lt;Player>& Obj){
+        //ジャンプ中も移動可能とする
+        Obj->MoveRotationMotion();
+        Obj->JumpMotion();
+    }
+    //ステート実行中に毎ターン呼ばれる関数
+    void JumpState::Execute(const shared_ptr&lt;Player>& Obj){
+        //ジャンプ中も移動可能とする
+        Obj->MoveRotationMotion();
+        if (Obj->JumpMoveMotion()){
+            //通常状態に戻る
+            Obj->GetStateMachine()->ChangeState(DefaultState::Instance());
+        }
+    }
+    //ステートにから抜けるときに呼ばれる関数
+    void JumpState::Exit(const shared_ptr&lt;Player>& Obj){
+        //何もしない
+    }
+</pre>
+</div>
+　ここでは、<b>ジャンプが始まる瞬間</b>と、<b>ジャンプ中</b>で処理を分けられます。<br />
+　<b>ジャンプが始まる瞬間</b>は<b>JumpState::Enter()</b>に記述します。この関数はステートに入ったとき、1度しか呼ばれないので、そのような内容を記述します。ジャンプする、というのは、上向きの初速度を与え、あとは自由落下にまかせる、ということなので、初速度を設定するモーション関数（ここではObj->JumpMotion()関数）を呼び出せばいいのです。<br />
+　デフォルトステートのところでも説明したように、<b>モーション関数</b>である、<b>Obj->MoveRotationMotion()</b>はここでも呼ばれます。つまり<b>ジャンプ中でも移動や回転は可能</b>という設計になっています。<br />
+　もし、ジャンプ中は、向きの変更や移動方向の変更ができない（つまり空中では慣性に任せる）のであれば、ジャンプステート内の<b>Obj->MoveRotationMotion()呼び出し</b>をコメントにすればいいのです。この関数をコメントにしても、ジャンプそのものに影響があるわけではありません。<b>ジャンプする</b>と<b>移動と回転する</b>というモーション処理を、分けて記述しているから、そのあたりの処理の変更も簡単にできます。<br />
+　ということは、ジャンプ中の処理に、別の処理を加えたい場合は、そのようなモーション関数を記述して、ジャンプのステートから呼び出せばいいのです。この関数は、デフォルト処理では行いたくなければ、デフォルトステートでは呼び出さなければいいのです。<br />
+　つまり、<b>ステートとモーション関数</b>により、あらゆる細かな処理が記述可能である、ということになります。<br />
+　そしてこの記述方法を頑固に守れば、<b>バグが少なく、可読性が高いソースになる</b>ということも忘れてはなりません。<br />
+<br />
+<h4>ステートマシン</h4>
+　ここまで説明してきた<b>ステート</b>のマネージャ的存在が<b>ステートマシン</b>です。<br />
+　ヘッダファイルで
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class Player : public GameObject;
+    //  用途: プレイヤー
+    //--------------------------------------------------------------------------------------
+    class Player : public GameObject{
+        <span class="red">shared_ptr&lt; StateMachine&lt;Player> >  m_StateMachine; //ステートマシーン</span>
+        //中略
+    public:
+        //中略
+        //アクセサ
+        <span class="red">shared_ptr&lt; StateMachine&lt;Player> > GetStateMachine() const{
+            return m_StateMachine;
+        }</span>
+
+        //中略
+    };
+</pre>
+</div>
+　のように宣言されています。上記のようにアクセサを用意します。<br />
+　<b>ステートマシン</b>はステートとは違い、シングルトンにはしません。同じクラスであっても、インスタンスごとに<b>状態</b>は異なります。<br />
+　<b>ステートマシン</b>はそのインスタンスの<b>現在のステート</b>を保持し、<b>ステート変更の関数(ChangeState()関数)</b>が呼ばれたら、そのれまでのステートの<b>Exit()関数</b>を呼び出し、新しいステートの<b>Enter()関数</b>
+を呼び出します。<br />
+　各ターン時は、ターンごとに現在のステートの<b>Execute()関数</b>を呼び出します。<br/>
+<br/>
+　<b>ステートマシン</b>の初期化は、そのオブジェクトの<b>OnCreate()関数内</b>で行います。<br />
+　プレイヤーの場合は、以下のように記述があります。
+<div class="box1">
+<pre>
+    //初期化
+    void Player::OnCreate(){
+        //中略
+        //ステートマシンの構築
+        m_StateMachine = make_shared&lt; StateMachine&lt;Player> >(GetThis&lt;Player>());
+        //最初のステートをDefaultStateに設定
+        m_StateMachine->ChangeState(DefaultState::Instance());
+    }
+</pre>
+</div>
+　ここでは、ステートマシンの構築後、最初のステートを<b>DefaultState::Instance()</b>に設定します。（ChangeState()関数が<b>新しいステートのEnter()関数</b>を呼び出します）。<br />
+　こうしておくと、<b>OnUpdate()関数</b>では、ステートマシンの更新のみ行えば、あとは、ステートの変更などは<b>各モーション関数</b>で行えるようになります。<br />
+　以下は、<b>Player::OnUpdate()関数</b>です。<br />
+<div class="box1">
+<pre>
+    //更新
+    void Player::OnUpdate(){
+        //ステートマシンのUpdateを行う
+        //この中でステートの更新が行われる(Execute()関数が呼ばれる)
+        m_StateMachine->Update();
+    }
+</pre>
+</div>
+　このように、非常にシンプルです。<br />
+<br />
+<h4>速度の動的な変更</h4>
+　ここまで、<b>ステート、そしてステートマシン</b>の説明をしてきました。<br />
+　では肝心の、<b>プレイヤーの移動と回転</b>は、どこで行うのか、ということになります。<br />
+　これまでの文脈でも予想できるように、<b>Player::MoveRotationMotion()関数</b>で行います。<br />
+以下がソースです。<br />
+<div class="box1">
+<pre>
+    //移動して向きを移動方向にする
+    void Player::MoveRotationMotion(){
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        Vector3 Angle = GetAngle();
+        //Transform
+        auto PtrTransform = GetComponent&lt;Transform>();
+        //Rigidbodyを取り出す
+        auto PtrRedit = GetComponent&lt;Rigidbody>();
+        //現在の速度を取り出す
+        auto Velo = PtrRedit->GetVelocity();
+        //目的地を最高速度を掛けて求める
+        auto Target = Angle * m_MaxSpeed;
+        //目的地に向かうために力のかける方向を計算する
+        //Forceはフォースである
+        auto Force = Target - Velo;
+        //yは0にする
+        Force.y = 0;
+        //加速度を求める
+        auto Accel = Force / m_Mass;
+        //ターン時間を掛けたものを速度に加算する
+        Velo += (Accel * ElapsedTime);
+        //減速する
+        Velo *= m_Decel;
+        //速度を設定する
+        PtrRedit->SetVelocity(Velo);
+        //回転の計算
+        float YRot = PtrTransform->GetRotation().y;
+        Quaternion Qt;
+        Qt.Identity();
+        if (Angle.Length() > 0.0f){
+            //ベクトルをY軸回転に変換
+            float PlayerAngle = atan2(Angle.x, Angle.z);
+            Qt.RotationRollPitchYaw(0, PlayerAngle, 0);
+            Qt.Normalize();
+        }
+        else{
+            Qt.RotationRollPitchYaw(0, YRot, 0);
+            Qt.Normalize();
+        }
+        //Transform
+        PtrTransform->SetQuaternion(Qt);
+    }
+</pre>
+</div>
+　プレイヤーは<b>OnCreate()関数</b>で、<b>Rigidbodyコンポーネント</b>を加えておきます。<br />
+　そして、<b>速度</b>のパラメータである、<b>Rigidbodyコンポーネント</b>の<b>Velocity（速度）</b>を変更します。移動は、<b>速度を変更することで</b>行います。決して、<b>TransformのPositionを変更してはいけません</b>。移動は<b>Rigidbodyコンポーネント</b>が行います。<br/>
+<br/>
+　速度を決定するのに、まず移動方向を決めます。<br />
+　プレイヤーとコントローラの関係は以下のような関係になります。
+<p>&nbsp;</p>
+<img src="img/0006b.jpg" width="60%"/>
+<p>図0006b</p>
+<p>&nbsp;</p>
+　赤い線が<b>プレイヤーの目的の方向</b>です。<br />
+　この方向を決めるのに、<b>GetAngle()関数</b>を使います。
+<div class="box1">
+<pre>
+    void Player::MoveRotationMotion(){
+        //中略
+        Vector3 Angle = GetAngle();
+        //中略
+    }
+</pre>
+</div>
+　このように得た移動方向に速度を決定するのに
+<div class="box1">
+<pre>
+    void Player::MoveRotationMotion(){
+        //中略
+        //Rigidbodyを取り出す
+        auto PtrRedit = GetComponent&lt;Rigidbody>();
+        //現在の速度を取り出す
+        auto Velo = PtrRedit->GetVelocity();
+        <span class="red">//目的地を最高速度を掛けて求める
+        auto Target = Angle * m_MaxSpeed;
+        //目的地に向かうために力のかける方向を計算する
+        //Forceはフォースである
+        auto Force = Target - Velo;
+        //yは0にする
+        Force.y = 0;
+        //加速度を求める
+        auto Accel = Force / m_Mass;
+        //ターン時間を掛けたものを速度に加算する
+        Velo += (Accel * ElapsedTime);
+        //減速する
+        Velo *= m_Decel;</span>
+        //速度を設定する
+        PtrRedit->SetVelocity(Velo);
+        //中略
+    }
+</pre>
+</div>
+　という処理をしています。<br/>
+　赤い文字のところポイントです。<br />
+　まず、コントローラの向きを元に、向かおうとする場所を計算します。これは、移動方向に最高速度を掛けることで算出します。
+　次に、その場所に向かうのに、どのような力を加えたらいいのか（フォース）を計算します。<br />
+　以下の図を見てみましょう
+<p>&nbsp;</p>
+<img src="img/0006c.jpg" width="60%"/>
+<p>図0006c</p>
+<p>&nbsp;</p>
+　この図は、現在の速度と、向かいたい場所、そしてかけるべき力の関係を示しています。<br />
+　図のように、必要な力を得るために、ベクトルの引き算を行います。<br />
+　続いて、加速度を求めます。加速度は、フォースを質量で割って算出します。つまり、重いものは動かすのに多くの力が必要ですし、軽いものは小さい力ですみます。<br />
+　このようにして得た加速度<b>Accel</b>を、現在の速度に加算すればいいのですが、この処理は毎ターンごとに行いますので、ターン時間で掛けて（つまりターン単位に分割して）その結果を加算します。<br />
+　ここまでで、一応、コントローラの値をプレイヤーに伝達できますが、加速する分にはいいのですが減速するためにコントローラのスティックを逆方向に動かさなければいけません。<br />
+　それでは操作性が悪いので、スティックを離したら自動的に止まるようにするために、<b>速度を減速</b>します。<br />
+　これらの処理を行うのに、メンバ変数として<b>m_MaxSpeed（最高速度）、m_Mass（質量）、m_Decel（減速率）</b>を持ちます。それぞれコンストラクタの初期化指定子で初期化され、値は
+<div class="box1">
+<pre>
+        m_MaxSpeed(40.0f),  //最高速度
+        m_Decel(0.95f), //減速値
+        m_Mass(1.0f)    //質量
+</pre>
+</div>
+　となっています。これらの値を変更すると、動きが変わります。いろいろ試してみましょう。<br />
+<br />
+　プレーヤーの動きの計算は、上記の計算がベストではありません。ゲームにより、いろんな表現があると思いますが、ポイントは上記したように<b>Velosity（速度）を調節する</b>、ということです。<br />
+<br />
+<h4>そのほかのオブジェクト</h4>
+　チュートリアル６には、このほかにいくつかの障害物が実装されています。<b>Charactor.hとCharactor.cpp</b>に記述がありますので、確認しましょう。<br />
+　動かないボックス動くボックスも、ポイントは、<b>衝突判定コンポーネントのSetFixed(true)</b>の処理です。この処理で、各ボックスが、<b>プレイヤーなどに衝突しても、その影響で反発移動したりしない</b>ということになります。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="00_05.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="00_07.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
