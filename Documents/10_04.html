@@ -1,0 +1,66 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2015ドキュメント(2015年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１０４．オブジェクトの動的な追加</h3>
+<h4>オブジェクトの動的な追加とは</h4>
+　ゲーム中に登場するキャラクターは、ステージのクリエイト時に追加されるものばかりとは限りません。<br />
+　ゲーム開始時は少しでも、ステージが進むにつれて、新しいキャラクターをどんどん登場させるゲームもあります。<br />
+　この項と次項で、動的に追加する方法を紹介します。<br />
+　この項では、文字通り<b>オブジェクトの追加</b>です。<br />
+　サンプル104では、簡単な例を紹介しています。Sample104ディレクトリ内のソリューションを開いてリビルドして実行すると以下のような画面が現れます。
+<p>&nbsp;</p>
+<img src="img/1004a.jpg" width="80%"/>
+<p>図1004a</p>
+<p>&nbsp;</p>
+　プレイヤーをコントローラで操作して、Bボタンを押してみましょう。黄色いトーラスが出現します。<br />
+　これは、動的に<b>AddGameObject()テンプレート関数</b>を呼び出します。<br />
+<div class="box1">
+<pre>
+    //Bボタンでトーラスを作成する処理
+    void Player::TorusCreateMotion(){
+        //トーラスの追加
+        //20個までトーラス追加できる
+        auto Group = GetStage()->GetSharedObjectGroup(L"RollingTorusGroup");
+        if (Group->size() &lt; 20){
+            auto PtrTrans = GetComponent&lt;Transform>();
+            <span class="red">auto TorusPtr = GetStage()->AddGameObject&lt;RollingTorus>(PtrTrans->GetPosition());</span>
+            Group->IntoGroup(TorusPtr);
+        }
+    }
+</pre>
+</div>
+　赤くなっているところが追加する処理です。<b>TorusCreateMotion()</b>はモーション関数なので、ステートから呼び出されます。追加後グループに登録しているのは、追加の上限を数えるためです。ここでは20個まで追加できるようになってます。<br />
+<br/>
+　通常のオブジェクト（キャラクターなど）であればこの処理で問題ありません。増やしても限度があるでしょうから。しかし、増やしすぎると、モデルなどはリソースを使ったとしても、動きが鈍くなりますので気をつけましょう。<br />
+<br />
+　また、砲弾とか、攻撃する光線とか、大量に必要で、また、爆発後など消えてしまうものなどは、この方法だと無駄が多すぎます。<br />
+　そんな場合は、次項の<b>１０５．砲弾などの動的な追加</b>のような方法をとります。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_03.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="10_05.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
