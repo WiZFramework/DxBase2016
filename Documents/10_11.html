@@ -1,0 +1,143 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１１１．グループイベント</h3>
+<h4>グループにイベントを送る</h4>
+　<b>Sample106</b>で紹介したイベントは、グループに対しても送ることができます。<br />
+　<b>Sample111</b>ソリューションを開いて、リビルド、実行すると以下のような画面が出てきます。<br />
+　ここにはいつものようにプレイヤーを追いかけるオブジェクトが配置されてますが、Aボタンでプレイヤーをジャンプさせると、追いかけるオブジェクトの色が赤くなったり元に戻ったりするのがわかります。
+<p>&nbsp;</p>
+<img src="img/1011a.jpg" width="80%"/>
+<p>図1011a</p>
+<p>&nbsp;</p>
+　この機能は、<b>グループに対してのイベント送出</b>を行って実装しています。<br />
+　まず、<b>Character.h.cpp</b>に、追いかけるオブジェクトのグループ<b>SeekObjectGroup</b>を、<b>GameObjectGroup</b>の派生クラスとして作成します。<br/>
+　そして<b>OnEvent()仮想関数</b>を多重定義します。
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class SeekObjectGroup : public GameObjectGroup;
+    //  用途: 追いかけるオブジェクトのグループ
+    //--------------------------------------------------------------------------------------
+    class SeekObjectGroup : public GameObjectGroup{
+    public:
+        SeekObjectGroup();
+        virtual ~SeekObjectGroup();
+        //イベントの取得
+        void OnEvent(const shared_ptr&lt;Event>& event)override;
+    };
+</pre>
+</div>
+　実態では、<b>SeekObjectGroup::OnEvent()関数</b>に以下のように記述します。
+<div class="box1">
+<pre>
+    //イベントの取得
+    void SeekObjectGroup::OnEvent(const shared_ptr&lt;Event>& event){
+        for (auto& Ptr : GetGroupVector()){
+            if (!Ptr.expired()){
+                auto ShPtr = dynamic_pointer_cast&lt;SeekObject>(Ptr.lock());
+                if (ShPtr){
+                    ShPtr->RedColorMotion();
+                }
+            }
+        }
+    }
+</pre>
+</div>
+　そうしたうえで、<b>SeekObjectクラス</b>に<b>RedColorMotion()関数</b>を記述します(ヘッダに宣言をするのを忘れないように。)。必要なメンバ変数<b>m_IsRed</b>もbool型として実装しておきます。
+<div class="box1">
+<pre>
+    //色変更
+    void  SeekObject::RedColorMotion(){
+        auto PtrDraw = AddComponent&lt;PNTStaticDraw>();
+        if (m_IsRed){
+            PtrDraw->SetDiffuse(Color4(0.7f, 0.7f, 0.7f, 1.0f));
+            m_IsRed = false;
+        }
+        else{
+            PtrDraw->SetDiffuse(Color4(1.0f, 0, 0, 1.0f));
+            m_IsRed = true;
+        }
+    }
+</pre>
+</div>
+　イベントを送る側ですが、Playerこれは、Playerに記述します。ジャンプするタイミングと同じ、<b>Player::JumpMotion()関数</b>に記述します。
+<div class="box1">
+<pre>
+    //Aボタンでジャンプする瞬間の処理
+    void Player::JumpMotion(){
+        auto PtrTrans = GetComponent&lt;Transform>();
+        //重力
+        auto PtrGravity = GetComponent&lt;Gravity>();
+        //ジャンプスタート
+        Vector3 JumpVec(0.0f, 4.0f, 0);
+        if (PtrTrans->GetParent()){
+            //親がいたら、アクションコンポーネントの移動アクションを探す
+            //移動ボックスに乗っている場合、その慣性をジャンプに加算する
+            auto ActionPtr = PtrTrans->GetParent()->GetComponent&lt;Action>(false);
+            if (ActionPtr){
+                JumpVec += ActionPtr->GetVelocity();
+            }
+        }
+        PtrGravity->StartJump(JumpVec);
+        <span class="red">//ここで追いかけるオブジェクトにイベントを送る
+        auto Group = GetStage()->GetSharedObjectGroup&lt;SeekObjectGroup>(L"ObjectGroup");
+        PostEvent(0, GetThis&lt;Player>(), Group, L"RedEvent");</span>
+    }
+</pre>
+</div>
+　最後に、GameStageですが、追いかけるオブジェクトのクリエイト時に以下のように記述します。
+<div class="box1">
+<pre>
+    //追いかけるオブジェクトの作成
+    void GameStage::CreateSeekObject(){
+        <span class="red">//オブジェクトのグループを作成して設定する
+        auto Group = ObjectFactory::Create&lt;SeekObjectGroup>();
+        SetSharedObjectGroup(L"ObjectGroup", Group);</span>
+        //配列の初期化
+        vector&lt;Vector3> Vec = {
+            { 0, 0.125f, 10.0f },
+            { 10.0f, 0.125f, 0.0f },
+            { -10.0f, 0.125f, 0.0f },
+            { 0, 0.125f, -10.0f },
+        };
+        //配置オブジェクトの作成
+        for (auto v : Vec){
+            AddGameObject&lt;SeekObject>(v);
+        }
+    }
+</pre>
+</div>
+　こうすることによって、追いかけるオブジェクトのグループは<b>SeekObjectGroup型</b>になります。
+
+
+
+<br/>
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_10.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

@@ -1,0 +1,79 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>２．カメラとコントローラ以外の入力</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>２０３．LookAtカメラをカスタマイズする</h3>
+<h4>LookAtカメラをライブラリから外す</h4>
+　<b>LookAtカメラ</b>はサンプル中にどこにでも登場しますが、実際のゲームでは、そのまま使用するわけにはいきません。ゲームにはゲーム特有のカメラがあって、自由にあちこち見えたり、自由にズームできるのが必ずしもベストとは限りません。<b>LookAtカメラ</b>はそういう意味ではデバッグ用のカメラであって、実際には各ゲームごとにカメラを用意します。<br />
+　とはいえ、カメラを0から自作するのはかなり大変です。その手間をできるだけ軽減する方法として、前項では<b>カメラマンオブジェクト</b>を紹介しましたが、その方法ではなく、<b>LookAtカメラをカスタマイズ</b>することで、各ゲームにあったカメラを実装したい時があります。<br />
+　このサンプルでは、<b>LookAtカメラをライブラリから外す</b>方法を紹介します。<br />
+<br/>
+　<b>GameStage.h、cpp</b>に、<b>LookAtカメラをライブラリから外した、MyCameraクラス</b>があります。<br />
+　このカメラは、<b>LookAtカメラ</b>と同じ動きをします。もし、カスタマイズする場合は、<b>OnUpdate()関数やOnCreate()関数</b>を変更します。<br />
+<br />
+　そして実装には、以下のように、<b>GameStage.cppのGameStage::CreateViews()関数</b>で、<b>MyCamera</b>を設定します。<br />
+<div class="box1">
+<pre>
+    //ビュー類の作成
+    void GameStage::CreateViews(){
+
+        //中略
+
+        <span class="red">//最初のビューにパラメータの設定
+        PtrView->ResetParamaters&lt;MyCamera, MultiLight>(rect, 
+            Color4(0.0f, 0.125f, 0.3f, 1.0f), 1, 0.0f, 1.0f);</span>
+
+        //中略
+
+    }
+
+</pre>
+</div>
+　そして、<b>PlayerクラスのOnCreate()関数</b>で、MyCameraを設定します。
+<div class="box1">
+<pre>
+    //初期化
+    void Player::OnCreate(){
+
+        //中略
+
+        //0番目のビューのカメラを得る
+        <span class="red">//MyCameraである
+        auto PtrCamera = dynamic_pointer_cast&lt;MyCamera>(GetStage()->GetCamera(0));
+        if (PtrCamera){
+            //MyCameraに注目するオブジェクト（プレイヤー）の設定
+            PtrCamera->SetTargetObject(GetThis&lt;GameObject>());
+        }</span>
+
+        //中略
+    }
+</pre>
+</div>
+　以上で、<b>MyCamera</b>を使ったゲーム画面になります。あとは、各自思うようにカスタマイズします。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="20_02.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

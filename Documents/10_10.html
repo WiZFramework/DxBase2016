@@ -1,0 +1,99 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１１０．障害物回避ステアリング</h3>
+<h4>障害物回避とは</h4>
+　レースゲームなどで、敵キャラ（AI動作のレーサー）を実装するのは、結構大変です。個別に作成するとなると、よけるべき壁とか、よけるべき障害物とか、それも自然によけてかなければならず、プログラミングも膨大になるでしょう。<br />
+　しかし、<b>Sample110</b>はそんな要求にこたえる（というかヒントになる）サンプルです。<br />
+　<b>Sample110</b>ソリューションを開いて、リビルド、実行すると以下のような画面が出てきます。
+<p>&nbsp;</p>
+<img src="img/1010a.jpg" width="80%"/>
+<p>図1010a</p>
+<p>&nbsp;</p>
+　ここにはいつものようにプレイヤーを追いかけるオブジェクトが配置されてますが、プレイヤーをあちこちに動かしてみると、追い掛けるオブジェクトが、いつもの動きとは違うことに気が付くと思います。<br />
+　ためしに、配置されているカプセル型のオブジェクトの陰に隠れてみましょう。<br />
+　追いかけるオブジェクトは、カプセルを避けるようにしながら、なおかつ、プレイヤーを追いかけていきます。<br />
+　この操舵は<b>障害物回避</b>といいます。そしてこの特徴は、障害物を<b>必ずよける</b>のではありません。<br />
+　現在のスピードやら、プレイヤーとの位置関係によっては、<b>よけようとしてもぶつかってしまう</b>こともあります。<br />
+　まるで、それぞれにドライバーがいて、障害物をよけながらプレイヤーを追いかける。そんな動きになります。<br />
+<br />
+　この操舵を実現しているのは、<b>ObstacleAvoidanceSteering</b>です。これを<b>SeekObjectクラス</b>に実装するわけですが、その前に準備があります。<br />
+　以下は、障害物である、<b>CapsuleObjectのOnCreate()</b>ですが、まず、あらかじめ作成した障害物のグループ（このグループの作成は、GameStage.cppで行ってます）に自分自身を追加します。
+<div class="box1">
+<pre>
+    void CapsuleObject::OnCreate(){
+
+        //中略
+
+        //オブジェクトのグループを得る
+        auto Group = GetStage()->GetSharedObjectGroup(L"CapsuleGroup");
+        //グループに自分自身を追加
+        Group->IntoGroup(GetThis&lt;CapsuleObject>());
+
+        //中略
+
+    }
+</pre>
+</div>
+　こうしておいて、<b>SeekObjectクラスのOnCreate()</b>で参照しながら、障害物を登録します。
+<div class="box1">
+<pre>
+    void SeekObject::OnCreate(){
+        //中略
+        <span class="red">//ObstacleAvoidance操舵
+        auto PtrObstacleAvoidance = AddComponent&lt;ObstacleAvoidanceSteering>();
+        //Capsuleオブジェクトのグループを得る
+        auto CapsuleGroup = GetStage()->GetSharedObjectGroup(L"CapsuleGroup");
+        vector&lt;SPHERE> SphereVec;
+        for (size_t i = 0; i &lt; CapsuleGroup->size(); i++){
+            auto Obj = CapsuleGroup->at(i);
+            auto PtrTrans = Obj->GetComponent&lt;Transform>();
+            SPHERE Sp;
+            Sp.m_Center = PtrTrans->GetPosition();
+            Sp.m_Center.y = 0.0f;
+            Sp.m_Radius = 2.0f;
+            SphereVec.push_back(Sp);
+        }
+        PtrObstacleAvoidance->SetObstacleSphereVec(SphereVec);</span>
+        //中略
+    }
+</pre>
+</div>
+　このように、障害物は<b>SPHEREのvector</b>を渡して登録します。こうしておくと、<b>ObstacleAvoidanceSteering</b>は障害物をよけるような操舵（フォース）を発生させて、結果的に、<b>SeekSteeringもしくはArriveSteering</b>と共存しながら、オブジェクトの速度を調整します。<br />
+<br/>
+<h4>障害物回避の利用どころ</h4>
+　さて、この操舵の利用どころですが、冒頭述べたように、たとえば<b>レーシングゲーム</b>に使用できる可能性があります。<br />
+　前項のサンプルで、<b>経路巡回</b>を紹介しました。サンプルでは、たすき掛けにオブジェクトが巡回してましたが、もちろん、サーキットを1周するように記述することが可能です。そして、前々項では<b>面回避</b>のサンプルを紹介しました。これで、たとえば、サーキット会場の外にはオブジェクトが出ていかないように記述できます。<br />
+　そして今回の<b>障害物回避</b>、です。これにより、サーキットコース場におかれた障害物（現実には危険なので、あまりないが、サーキットゲームには必須なアイテム）を配置できます。以上は敵キャラの動きのAI操作ですね。<br />
+　そして、プレイヤー自身は、<b>Sample202で紹介した、オブジェクトをカメラマンにするカメラ</b>で、視点を演出すれば・・・？？<br />
+　もう、簡単なレーシングゲームが出来そうですね・・・。
+<br/>
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_09.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="10_11.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

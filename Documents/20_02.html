@@ -1,0 +1,156 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>２．カメラとコントローラ以外の入力</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>２０２．オブジェクトをカメラマンにするカメラ</h3>
+<h4>カメラ操作</h4>
+　<b>カメラ操作</b>は、ゲームになくてはならないものです。そしてその調整は結構厄介で、カメラの動きを<b>カメラから見た状態</b>で調整しなければならない場合、何か雲をつかむような作業が必要です。<br />
+<br />
+　しかし、たとえば映画撮影を考えてみてください。<br />
+　カメラマンはレールに乗ったり、クレーンで持ち上げられたりしながら撮影しますが、監督は必ずしもそうではありません。<br />
+　ディレクターチェアに座った状態で、カメラマンの動きを見ながら、あるいは、そのカメラが映すフレームを想像しながら演出を加えます。時には、カット撮影後、上がった映像をチェックしながら、自分の思い描いた映像が撮れてるかどうか確認します。<br />
+　つまり、監督とカメラマンを切り離すことにより、監督は、ファインダーから覗いた状態だけではなく、全体を俯瞰しながら撮影を進めていきます。<br />
+　ゲーム制作にもこのような<b>カメラマン</b>がいたら便利だろうということで、今回のサンプルでは、<b>オブジェクトにカメラを結び付ける</b>方法を紹介します。<br />
+　<b>Sample202</b>を開いて、リビルド、そして実行してみてください。以下のような画面が出てきます。
+<p>&nbsp;</p>
+<img src="img/2002a.jpg" width="80%"/>
+<p>図2002a</p>
+<p>&nbsp;</p>
+　コントローラを動かしてみると、<b>チュートリアル008</b>とほとんど同じなのがわかります。<br />
+　しかしよく見ると、プレイヤーを空中で追いかける丸い物体があるのがわかります。これが<b>カメラマン</b>です。<br />
+<br />
+<h4>カメラマンを演出する</h4>
+　サンプルでは、実際にゲーム画面を表示しているのは、いつもの<b>LookAtCamera</b>です。<br />
+　これは映画でいえば監督の視線といえます。カメラを引いて全体を見ることもできるし、プレイヤーの動きを細かく演出することもできます。<br />
+　それでは<b>GameStage.cpp</b>の<b>CreateViews()関数</b>のカメラの設定の部分を以下のように変えてみましょう。コメントになっているので、<b>LookAtCamaraをコメントにし、Camaraを有効</b>にします。<br/>
+<div class="box1">
+<pre>
+    //ビュー類の作成
+    void GameStage::CreateViews(){
+
+        //中略
+
+        //最初のビューにパラメータの設定
+        //オブジェクトカメラを使う場合は、以下
+        <span class="red">PtrView->ResetParamaters&lt;Camera, MultiLight>(rect, ViewBkColor, 1, 0.0f, 1.0f);</span>
+        //LookAtカメラを使う場合は、以下
+        <span class="blue">//コメントにする PtrView->ResetParamaters&lt;LookAtCamera, MultiLight>(rect,
+        //   ViewBkColor, 1, 0.0f, 1.0f);</span>
+
+        //中略
+
+    }
+</pre>
+</div>
+　ビルドして実行すると、以下の画面になります。
+<p>&nbsp;</p>
+<img src="img/2002b.jpg" width="80%"/>
+<p>図2002b</p>
+<p>&nbsp;</p>
+　今度はコントローラを動かすと、先ほどとは違う印象です。つまり、先ほど空中に浮かんでいた物体から見た状態の視線になっています。<br/ >
+　さきほど空中に浮かんでいたオブジェクトは、<b>Charactor.h、cpp</b>にあります、<b>SeekCamera</b>クラスです。<br />
+　<b>コンストラクタ、OnCreate関数、OnUpdate()関数</b>を持ちます。コンポーネントは、<b>Seek操舵（SeekSteering）、Arrive操舵（ArriveSteering）</b>を持ちます。ステートによって操舵を振り分けます。<br />
+　以下はOnCretae()関数です。
+<div class="box1">
+<pre>
+    //初期化
+    void SeekCamera::OnCreate(){
+
+        //中略
+
+        //操舵系のコンポーネントをつける場合はRigidbodyをつける
+        auto PtrRegid = AddComponent&lt;Rigidbody>();
+        //Seek操舵
+        auto PtrSeek = AddComponent&lt;SeekSteering>();
+        PtrSeek->SetWeight(5.0f);
+        PtrSeek->SetUpdateActive(false);
+
+        //Arrive操舵
+        auto PtrArrive = AddComponent&lt;ArriveSteering>();
+        PtrArrive->SetWeight(5.0f);
+        PtrArrive->SetUpdateActive(false);
+
+        //中略
+
+        <span class="red">//使用しているのはCameraである
+        auto PtrCamera = dynamic_pointer_cast&lt;Camera>(GetStage()->GetCamera(0));
+        //LookAtCameraである
+        auto PtrLookAtCamera = dynamic_pointer_cast&lt;LookAtCamera>(GetStage()->GetCamera(0));
+        if (!PtrLookAtCamera && PtrCamera){
+            //Cameraを使用してるならオブジェクトカメラに設定
+            PtrCamera->SetCameraObject(GetThis&lt;SeekCamera>());
+        }</span>
+
+        //中略
+    }
+
+</pre>
+</div>
+　赤いところは、実際に実装されてるカメラの種類によって、設定しています。<br />
+　以下は、<b>カメラオブジェクトが向かう先</b>を計算する関数です。Seek操舵やArrive操舵はこの結果をもとに、操舵の目標を設定します。<br />
+　また、赤いところで、カメラの注目点を決定してます。
+<div class="box1">
+<pre>
+    //カメラの向かう位置を得る
+    Vector3 SeekCamera::GetCameraTargetMotion(bool IsFar){
+        Vector3 CameraTarget(0, 1.25f, -4.0f);
+        auto PtrPlayer = GetStage()->GetSharedGameObject&lt;Player>(L"Player", false);
+        if (PtrPlayer){
+            CameraTarget = PtrPlayer->GetComponent&lt;Transform>()->GetPosition();
+            CameraTarget.y += 1.0f;
+
+            auto Rot = PtrPlayer->GetComponent&lt;Transform>()->GetRotation();
+            Vector3 RotVec(sin(Rot.y), 0, cos(Rot.y));
+            RotVec.Normalize();
+
+            if (IsFar){
+                RotVec *= -1.0f;
+            }
+            else{
+                RotVec *= -4.0f;
+            }
+            CameraTarget += RotVec;
+
+            //使用しているのはCameraである
+            auto PtrCamera = dynamic_pointer_cast&lt;Camera>(GetStage()->GetCamera(0));
+            //LookAtCameraである
+            auto PtrLookAtCamera = dynamic_pointer_cast&lt;LookAtCamera>(GetStage()->GetCamera(0));
+            if (!PtrLookAtCamera && PtrCamera){
+                <span class="red">//Cameraを使用してるならカメラの注目点をプレイヤーに設定
+                PtrCamera->SetAt(PtrPlayer->GetComponent&lt;Transform>()->GetPosition());</span>
+            }
+        }
+        return CameraTarget;
+    }
+</pre>
+</div>
+　また、カメラを切り替えることによるプレイヤーの動きの違いを記述する場合は<b>Player::GetAngle()</b>に記述するといいでしょう。<br />
+　このサンプルでは、いずれのカメラもカメラからプレイヤーに結んだ線上に向かうので、違いはありません。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="20_01.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="20_03.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
