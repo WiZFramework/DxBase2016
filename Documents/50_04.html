@@ -1,0 +1,423 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>５．アルゴリズム研究</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>５０４．インターフェイスを使った処理の振り分け</h3>
+<br />
+<h4>dynamic_castの使用</h4>
+　例えば、衝突した相手が、敵キャラかどうかを判断する手段として、dynamic_cast（shared_ptrならばdynamic_pointer_cast）を使う方法はすぐに思いつきます。<br />
+　dynamic_castのように、実行時に型情報を取得して操作することを<b>RTTI</b>といいます。<b>RTTI</b>は、大変便利ですが、使いすぎると以下のようになってしまいます。<br />
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //dynamic_pointer_castによる相手の特定
+        auto PtrEnemy1 = dynamic_pointer_cast&lt;Enemy1>(other);
+        auto PtrEnemy2 = dynamic_pointer_cast&lt;Enemy2>(other);
+        auto PtrEnemy3 = dynamic_pointer_cast&lt;Enemy3>(other);
+        auto PtrEnemy4 = dynamic_pointer_cast&lt;Enemy4>(other);
+        auto PtrEnemy5 = dynamic_pointer_cast&lt;Enemy5>(other);
+        auto PtrEnemy6 = dynamic_pointer_cast&lt;Enemy6>(other);
+        if(PtrEnemy1){
+            //相手がEnemy1だった
+            PtrEnemy1->HitAction();
+        }
+        else if(PtrEnemy2){
+            //相手がEnemy2だった
+            PtrEnemy2->HitAction();
+        }
+        else if(PtrEnemy3){
+            //相手がEnemy3だった
+            PtrEnemy3->HitAction();
+        }
+        else if(PtrEnemy4){
+            //相手がEnemy4だった
+            PtrEnemy4->HitAction();
+        }
+        else if(PtrEnemy5){
+            //相手がEnemy5だった
+            PtrEnemy5->HitAction();
+        }
+        else if(PtrEnemy6){
+            //相手がEnemy6だった
+            PtrEnemy6->HitAction();
+        }
+        //そのほかの処理
+    }
+</pre>
+</div>
+　この例は、見るからに助長的です。HitAction()というメンバ関数を各Enemyは保持しているわけですが、例えばHitAction()関数を仮想関数にすると目に見えてすっきりします。<br />
+　仮想関数にするには2つの方法があります、各Enemyの親クラスを定義して、すべてのEnemyをその派生クラスにします。そして親クラス側に、HitAction()を純粋仮想関数として宣言します。
+<div class="box1">
+<pre>
+class Enemy : public GameObject{
+    //中略
+public:
+    //純粋仮想関数
+    virtual void HitAction() = 0;
+};
+
+class Enemy1 : public Enemy{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction() override {
+        //何かの処理
+    }
+};
+class Enemy2 : public Enemy{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction() override {
+        //何かの処理
+    }
+};
+//以下略
+</pre>
+</div>
+　このように設計すると、Player側では以下のように記述できます。
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //dynamic_pointer_castによる敵の特定
+        auto PtrEnemy = dynamic_pointer_cast&lt;Enemy>(other);
+        if(PtrEnemy){
+            //相手がEnemyかその派生クラスだった
+            //HitAction()は敵が持つ仮想関数
+            PtrEnemy->HitAction();
+        }
+        //そのほかの処理
+    }
+</pre>
+</div>
+　このように、敵キャラなどを親クラスを作ってまとめておくと、各Enemyで共通して使用できるの関数を、親クラスに書くこともできて非常にコードがすっきりします。<br />
+<br />
+<h4>インターフェイスの使用</h4>
+　親クラスでまとめる方法は、確かにかなり便利ですが、各敵キャラが同じような処理をすることが少ない場合や、敵キャラに限らず、プレイヤーとヒットした場合に、個別処理を呼び出したい場合は、親クラスを作成する代わりに<b>インターフェイス</b>というのを作成できます。
+<div class="box1">
+<pre>
+//敵インターフェイス
+class EnemyInterface{
+    //中略
+public:
+    //純粋仮想関数
+    virtual void HitAction() = 0;
+};
+
+class Enemy1 : public GameObject,public EnemyInterface{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction() override {
+        //何かの処理
+    }
+};
+class Enemy2 : public GameObject,public EnemyInterface{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction() override {
+        //何かの処理
+    }
+};
+//以下略
+</pre>
+</div>
+　C++は多重継承という機能があります。つまり、親クラスは必ずしも一つでなくてもよいという仕様です。そのため、<b>EnemyInterfaceクラス</b>のように、純粋仮想関数の宣言だけ行うクラスを作成し、そのクラスを継承することで、派生クラスに、仮想関数の定義の実装を義務化することができます。<br />
+　このように設計しても、親クラスを挟む場合と変わりなく、プレイヤー側を処理できます。また、後付けでコードの整理を行う場合など、親クラス（Enemyクラス）をわざわざ作成する必要がなく便利です。<br />
+<br />
+<h4>ダブルデスパッチ</h4>
+　さて、<b>プレイヤーと衝突した時の処理</b>の、敵側の処理は、上記の方法で済むのですが、プレイヤー側で処理をしたい場合は、また、dynamic_castのオンパレードになってしまうことがあります。以下の例です。
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //dynamic_pointer_castによる相手の特定
+        auto PtrEnemy1 = dynamic_pointer_cast&lt;Enemy1>(other);
+        auto PtrEnemy2 = dynamic_pointer_cast&lt;Enemy2>(other);
+        auto PtrEnemy3 = dynamic_pointer_cast&lt;Enemy3>(other);
+        auto PtrEnemy4 = dynamic_pointer_cast&lt;Enemy4>(other);
+        auto PtrEnemy5 = dynamic_pointer_cast&lt;Enemy5>(other);
+        auto PtrEnemy6 = dynamic_pointer_cast&lt;Enemy6>(other);
+        if(PtrEnemy1){
+            //相手がEnemy1だった
+            HitActionEnemy1();
+        }
+        else if(PtrEnemy2){
+            //相手がEnemy2だった
+            HitActionEnemy2();
+        }
+        else if(PtrEnemy3){
+            //相手がEnemy3だった
+            HitActionEnemy3();
+        }
+        else if(PtrEnemy4){
+            //相手がEnemy4だった
+            HitActionEnemy4();
+        }
+        else if(PtrEnemy5){
+            //相手がEnemy5だった
+            HitActionEnemy5();
+        }
+        else if(PtrEnemy6){
+            //相手がEnemy6だった
+            HitActionEnemy6();
+        }
+        //そのほかの処理
+    }
+</pre>
+</div>
+　上記のHitActionEnemy1()、HitActionEnemy2()、HitActionEnemy6()などは、プレイヤー側のメンバ関数です。それぞれの敵に合わせた処理を行います。<br />
+　これも実は、<b>ダブルデスパッチ</b>という方法で、dynamic_castを大幅に減らせます。上記した、敵側の親クラスやインターフェイスを作成する例と併用して使えます。
+<div class="box1">
+<pre>
+//敵インターフェイス
+class EnemyInterface{
+    //中略
+public:
+    //純粋仮想関数
+    virtual void HitAction(const shared_ptr&lt;Player>& ply) = 0;
+};
+
+class Enemy1 : public GameObject,public EnemyInterface{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction(const shared_ptr&lt;Player>& ply)override{
+        //敵側の何かの処理
+        //続いて以下の処理をする
+        ply->HitActionEnemy1(GetThis&lt;Enemy1>());
+    }
+};
+class Enemy2 : public GameObject,public EnemyInterface{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction(const shared_ptr&lt;Player>& ply)override{
+        //敵側の何かの処理
+        //続いて以下の処理をする
+        ply->HitActionEnemy2(GetThis&lt;Enemy2>());
+    }
+};
+//以下略
+</pre>
+</div>
+　このようにすると、プレイヤー側で以下のような定義ができます。
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //dynamic_pointer_castによる敵の特定
+        //
+        auto PtrEnemy = dynamic_pointer_cast&lt;EnemyInterface>(other);
+        if(PtrEnemy){
+            //相手がEnemyかその派生クラスだった
+            //HitAction()は敵が持つ仮想関数
+            PtrEnemy->HitAction(GetThis&lt;Player>());
+        }
+        //そのほかの処理
+    }
+    //ダブルデスパッチで呼ばれる関数群
+    void Player::HitActionEnemy1(const shared_ptr&lt;Enemy1>& e1){
+        //Enrmy1との衝突処理
+    }
+    void Player::HitActionEnemy2(const shared_ptr&lt;Enemy2>& e2){
+        //Enrmy2との衝突処理
+    }
+    //以下略
+</pre>
+</div>
+　これで、dynamic_castの数は、プレイヤー側で行う、<b>EnemyInterfaceの派生クラスを特定</b>だけになります。<br />
+<br />
+　これで一応完成で問題ないのですが、プレイヤー側の関数<b>HitActionEnemy1()、HitActionEnemy2()</b>などの関数名がなんとなく助長的です。<br />
+　C++は<b>関数の多重定義</b>ができるので、以下のように、敵側、プレイヤー側を書き換えることができます。<br />
+　まず敵側です。
+<div class="box1">
+<pre>
+//敵インターフェイス
+class EnemyInterface{
+    //中略
+public:
+    //純粋仮想関数
+    virtual void HitAction(const shared_ptr&lt;Player>& ply) = 0;
+};
+
+class Enemy1 : public GameObject,public EnemyInterface{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction(const shared_ptr&lt;Player>& ply)override{
+        //敵側の何かの処理
+        //続いて以下の処理をする
+        <span class="red">ply->HitActionEnemy(GetThis&lt;Enemy1>());</span>
+    }
+};
+class Enemy2 : public GameObject,public EnemyInterface{
+    //中略
+public:
+    //仮想関数
+    virtual void HitAction(const shared_ptr&lt;Player>& ply)override{
+        //敵側の何かの処理
+        //続いて以下の処理をする
+        <span class="red">ply->HitActionEnemy(GetThis&lt;Enemy2>());</span>
+    }
+};
+//以下略
+</pre>
+</div>
+　続いてプレイヤー側です。
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //dynamic_pointer_castによる敵の特定
+        //
+        auto PtrEnemy = dynamic_pointer_cast&lt;EnemyInterface>(other);
+        if(PtrEnemy){
+            //相手がEnemyかその派生クラスだった
+            //HitAction()は敵が持つ仮想関数
+            PtrEnemy->HitAction();
+        }
+        //そのほかの処理
+    }
+    <span class="red">//ダブルデスパッチで呼ばれる関数群
+    void Player::HitActionEnemy(const shared_ptr&lt;Enemy1>& e1){
+        //Enrmy1との衝突処理
+    }
+    void Player::HitActionEnemy(const shared_ptr&lt;Enemy2>& e2){
+        //Enrmy2との衝突処理
+    }</span>
+    //以下略
+</pre>
+</div>
+　プレイヤー側の<b>HitActionEnemy()関数</b>は、引数の型が違うだけの多重定義関数です。敵側で、自分自身のポインタを渡すことで、プレイヤー側で相手を特定することができます。<br />
+<br />
+<h4>サンプル解説</h4>
+　<b>Sample504</b>を実行すると以下のような画面になります。プレイヤーを移動させ、固定ボックスとヒットした場合は、赤いエフェクト、上下するボックスと衝突した場合は緑のエフェクトが出ます。
+<p>&nbsp;</p>
+<img src="img/5004a.jpg" width="80%"/>
+<p>図5004a</p>
+<p>&nbsp;</p>
+　まず、ボックス側のインターフェイスクラスを作成し、各ボックスを、そのインターフェイスを継承します。<b>Character.h</b>に記述します。
+<div class="box1">
+<pre>
+    //プレイヤーの宣言
+    class Player;
+    //--------------------------------------------------------------------------------------
+    //  class AssignInterface;
+    //  用途: 振り分けするインターフェイス
+    //--------------------------------------------------------------------------------------
+    class AssignInterface{
+    protected:
+        AssignInterface(){}
+        virtual ~AssignInterface(){}
+    public:
+        <span class="red">virtual void AssignAction(const shared_ptr&lt;Player>& ply) = 0;</span>
+
+    };
+
+    //--------------------------------------------------------------------------------------
+    //  class FixedBox : public GameObject,public AssignInterface;
+    //  用途: 固定のボックス
+    //--------------------------------------------------------------------------------------
+    class FixedBox : public GameObject, public AssignInterface{
+        //中略
+    public:
+        //中略
+        //操作
+        <span class="red">virtual void AssignAction(const shared_ptr&lt;Player>& ply)override;</span>
+    };
+
+    //--------------------------------------------------------------------------------------
+    //  class MoveBox : public GameObject, public AssignInterface;
+    //  用途: 上下移動するボックス
+    //--------------------------------------------------------------------------------------
+    class MoveBox : public GameObject, public AssignInterface{
+        //中略
+    public:
+        //中略
+        //操作
+        <span class="red">virtual void AssignAction(const shared_ptr&lt;Player>& ply)override;</span>
+    };
+</pre>
+</div>
+　続いてボックス側の実体です。Character.cppに記述します。上記関数の実体のみ紹介します。
+<div class="box1">
+<pre>
+    void FixedBox::AssignAction(const shared_ptr&lt;Player>& ply){
+        ply->ActionWithBox(GetThis&lt;FixedBox>());
+    }
+
+    void MoveBox::AssignAction(const shared_ptr&lt;Player>& ply){
+        ply->ActionWithBox(GetThis&lt;MoveBox>());
+    }
+</pre>
+</div>
+　プレイヤー側の宣言です。Player.hに記述します。
+<div class="box1">
+<pre>
+    //--------------------------------------------------------------------------------------
+    //  class Player : public GameObject;
+    //  用途: プレイヤー
+    //--------------------------------------------------------------------------------------
+    class Player : public GameObject{
+        //中略
+    public:
+        //中略
+
+        <span class="red">//衝突した相手による個別処理
+        void ActionWithBox(const shared_ptr&lt;FixedBox>& FBox);
+        void ActionWithBox(const shared_ptr&lt;MoveBox>& MBox);</span>
+        //更新
+        //中略
+        virtual void OnCollision(const shared_ptr&lt;GameObject>& other) override;
+    };
+</pre>
+</div>
+　続いて実体です。Player.cppに記述です。ボックスごとのActionWithBox()関数を記述します。
+<div class="box1">
+<pre>
+    //衝突した相手による個別処理
+    void Player::ActionWithBox(const shared_ptr&lt;FixedBox>& FBox){
+        auto PtrSpark 
+        = GetStage()->GetSharedGameObject&lt;MultiSpark>(L"MultiSpark", false);
+        if (PtrSpark){
+            PtrSpark->InsertSpark(GetComponent&lt;Transform>()->GetPosition(), 
+                Color4(1.0f, 0.0f, 0.0f, 1.0f));
+        }
+    }
+    void Player::ActionWithBox(const shared_ptr&lt;MoveBox>& MBox){
+        auto PtrSpark 
+        = GetStage()->GetSharedGameObject&lt;MultiSpark>(L"MultiSpark", false);
+        if (PtrSpark){
+            PtrSpark->InsertSpark(GetComponent&lt;Transform>()->GetPosition(),
+                Color4(0.0f,1.0f,0.0f,1.0f));
+        }
+    }
+</pre>
+</div>
+　以上で、dynamic_castは最小限の呼び出しで、処理の振り分けができます。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="50_03.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
