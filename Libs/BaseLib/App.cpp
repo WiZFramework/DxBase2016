@@ -328,11 +328,33 @@ namespace basedx11{
 		return PtrTexture;
 	}
 
-	//--------------------------------------------------------------------------------------
-	//	shared_ptr<AudioResource> RegisterWav(
-	//		const wstring& Key, // リソースキー
-	//		const wstring& WavFileName	//Wavファイル名
-	//	);
+	//スタティックモデルの登録(同じキーのモデルがなければファイル名で作成し、登録)
+	//同じ名前のモデルがあればそのポインタを返す
+	shared_ptr<MeshResource> App::RegisterStaticModelMesh(const wstring& Key, const wstring& BinDataDir, const wstring& BinDataFile){
+		if (CheckResource<MeshResource>(Key)){
+			return GetResource<MeshResource>(Key);
+		}
+		//
+		auto MesshPtr = MeshResource::CreateStaticModelMesh(BinDataDir, BinDataFile);
+		RegisterResource(Key, MesshPtr);
+		return MesshPtr;
+
+	}
+
+	//ボーンモデルの登録(同じキーのモデルがなければファイル名で作成し、登録)
+	//同じ名前のモデルがあればそのポインタを返す
+	shared_ptr<MeshResource> App::RegisterBoneModelMesh(const wstring& Key, const wstring& BinDataDir, const wstring& BinDataFile){
+		if (CheckResource<MeshResource>(Key)){
+			return GetResource<MeshResource>(Key);
+		}
+		//
+		auto MesshPtr = MeshResource::CreateBoneModelMesh(BinDataDir, BinDataFile);
+		RegisterResource(Key, MesshPtr);
+		return MesshPtr;
+	}
+
+	//Wavの登録(同じキーのWavがなければファイル名で作成し、登録)
+	//同じ名前のWavがあればそのポインタを返す
 	shared_ptr<AudioResource> App::RegisterWav(const wstring& Key, const wstring& WavFileName){
 		if (CheckResource<AudioResource>(Key)){
 			return GetResource<AudioResource>(Key);

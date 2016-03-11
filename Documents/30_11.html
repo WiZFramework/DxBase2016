@@ -1,0 +1,96 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３１１．サウンド</h3>
+<br />
+<h4>サウンドとは</h4>
+　<b>DxBase2016</b>では、前項の<b>ミュージック</b>とは扱いを変えています。その実体はあまり変わらないのですが、<b>ミュージック</b>がバックミュージックなど、再生時間が長いものに使用するのに対して、<b>サウンド</b>は効果音などの短い音の再生に使用します。<br />
+　<b>Sample307</b>で紹介した、SpriteStdioを使用したメニューの学生サンプルでもサウンドは使用されていますが、ここで改めて紹介します。<br />
+　<b>Sample311</b>ディレクトリを開き、リビルド、そして実行すると以下の画面が現れます。<br />
+　内容的には<b>Sample302</b>のパーティクルの表示と同じです。<br />
+　しかし、今回は、パーティクルの出るタイミングで、<b>ピン</b>という音が鳴ります。
+<p>&nbsp;</p>
+<img src="img/3011a.jpg" width="80%"/>
+<p>図3011a</p>
+<p>&nbsp;</p>
+　この音は、<b>Sample307</b>のメニュー項目を変化させるときに使用した音と同じです。<b>wavファイル</b>ですから、簡単に別の音に差し替えることができます。<br />
+<br />
+<h4>サウンドの再生</h4>
+　<b>サウンド</b>を鳴らすためには、まず<b>リソース登録</b>を行います。<br />
+　ここでは<b>GameStage.cpp</b>の<b>GameStage::CreateResourses()関数</b>で行います。<br />
+　以下はそのピックアップです。
+<div class="box1">
+<pre>
+    void GameStage::CreateResourses(){
+
+        //中略
+
+        <span class="red">wstring CursorWav = App::GetApp()->m_wstrRelativeDataPath + L"cursor.wav";
+        App::GetApp()->RegisterWav(L"Cursor", CursorWav);</span>
+    }
+</pre>
+</div>
+　ここでは、<b>mediaディレクトリ</b>の<b>cursor.wav</b>というwavファイルを、<b>Cursor</b>という名前で登録しています。<br />
+<br />
+　実際に再生する部分は、<b>Player.cpp</b>に記述します。
+　<b>サウンド再生オブジェクト</b>はコンポーネントです。ですので、<b>OnCreate()関数</b>でコンポーネントとして登録します。以下がその記述です。
+<div class="box1">
+<pre>
+    void Player::OnCreate(){
+        //中略
+
+        <span class="red">//サウンドを登録.
+        auto pMultiSoundEffect = AddComponent&lt;MultiSoundEffect>();
+        pMultiSoundEffect->AddAudioResource(L"Cursor");</span>
+
+        //中略
+
+    }
+</pre>
+</div>
+　これで、コンポーネントの設定は終わりです。<b>MultiSoundEffectコンポーネント</b>は複数のサウンドを設定することができますので、プレイヤーがたとえば、地面に着地したときに別な音を鳴らしたければ<b>AddAudioResource()</b>で、登録されたリソースを追加してください。<br />
+<br />
+　実際に鳴らす操作は以下です。衝突したタイミングで、パーティクルを出すときに鳴らします。<b>OnCollision()関数</b>に記述します。
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //中略
+
+        <span class="red">auto pMultiSoundEffect = AddComponent&lt;MultiSoundEffect>();
+        pMultiSoundEffect->Start(L"Cursor", 0, 0.5f);</span>
+
+    }
+</pre>
+</div>
+　ここで、<b>Start()関数</b>の引数ですが、<b>リソース名、繰り返し回数、ボリューム</b>となります。<br/>
+　<b>繰り返し回数</b>は、0で1回だけ再生します。（つまり<b>繰り返しなし</b>）。1で、2回再生します（つまり<b>繰り返し1回</b>）。ややこしいですが、このような設定になります。<br/>
+　ボリュームは1.0がデフォルトです。サウンドによっては、音が大きすぎたり小さすぎたりする場合、あるいは、大きく再生、小さく再生など、演出での大きさもあるでしょうから、調整してください。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_09.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="30_12.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

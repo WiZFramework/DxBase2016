@@ -1,0 +1,453 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３１３．CSV読み込みと書き込み</h3>
+<br />
+<h4>ゲームデータを切り離す必要性</h4>
+　これまでサンプルでは、ゲーム上に配置されるオブジェクトを、直接パラメータを渡して構築していました。<br />
+　しかし通常、ゲームのデータは、ファイルなどに保存しておき、ゲームの進行や難易度によって、データを別にします。そうすることにより、<b>似たようなステージを別々に作成しなくてすむ</b>設計になります。<br />
+　<b>DxBase2016</b>は、<b>CSV形式とXML形式</b>という2つのタイプのデータ形式を扱うことができます。<br />
+　それぞれ特徴があり、用途も違います。<b>CSV形式</b>は、単純だが大量にほしいデータなどに向いています。<br />
+　たとえば<b>ステージのマップ</b>があります。ステージ上を小さい区画で区切り、それぞれ<b>障害物があるかないか</b>を<b>1もしくは0</b>であらわすとします。区画が50×50で分けられるとすれば、2500のデータが必要になります。しかし、そのデータは<b>0もしくは1</b>であらわすことができます。<br/>
+　こんな場合は<b>CSV形式</b>が向いているといえます。<br />
+　ところが、たとえば<b>プレイヤーのレベルやライフ、遊んだトータル時間や保持する複雑なアイテム</b>など、複雑なデータを同時に処理する必要がある場合は、<b>CSV形式</b>では荷が重すぎます。コンピュータにとって荷が重いのではなく、それらのデータを作成する人間側の荷が重すぎるのです。<b>CSV形式</b>は、この後説明しますが、実体は<b>「,」コンマ</b>で区切られたデータを羅列するテキストファイルです。そのブロックには、多くは数字とか、単純な文字列とかが入るので、<b>大量になってくると人間には間違いやすい</b>形式となります。<br />
+　こんな場合は、次項で説明する<b>XML形式</b>が便利です、<b>XML形式</b>は、それぞれのデータに<b>それがどういうデータか、名前が付けられる</b>のです。<br />
+　たとえば、<b>敵キャラAがステージ3に登場するときの、持ってる強さとライフ値</b>などのように、細かくデータを分離することができるため、複雑なキャラクターや複雑なステージの設計に向いています。<br />
+　<b>Sample306、307</b>で紹介した<b>SpriteStdioデータ</b>は<b>XML形式</b>です。このデータは、キャラクターを<b>顔、手、胴、足</b>などのパーツにわけ、それぞれに親子関係を持たせてアニメーションをさせる画期的な仕組みですが、これらの機能を実装するのに<b>XML形式</b>を使用しています。<br />
+　まさに、<b>複雑なデータを一度に処理する場合</b>に当たります。<br />
+<br />
+<h4>CSV形式ファイルを読む</h4>
+　<b>Sample313</b>には、<b>CSV形式ファイル</b>を読み書きする場合の単純な例が紹介されてます。<br />
+　<b>Sample313ディレクトリ</b>のソリューションを開き、リビルド、実行すると以下の画面が現れます。いつものように追いかけてくるオブジェクトがあります。
+<p>&nbsp;</p>
+<img src="img/3013a.jpg" width="80%"/>
+<p>図3013a</p>
+<p>&nbsp;</p>
+　少しプレイヤーを動かして、プレイした後、エスケープキーを押すなどして、ゲームを終了させてみてください。<br/>
+　再び起動すると、先ほど終了した場所にプレイヤーは移動しています。つまり、終了時のプレイヤーの位置を保存しておき、次に起動したときに、そこから始まるように実装されています。<br />
+<br />
+　この機能を実装しているのはプレイヤーです。<b>Player.h、cpp</b>に記述があります。<br />
+　まずヘッダ部ですが、以下のように<b>CsvFileクラスのインスタンス</b>が宣言されています。
+<div class="box1">
+<pre>
+    class Player : public GameObject{
+        //中略
+        <span class="red">//プレイヤーの保存用csv
+        CsvFile m_PlayerCsv;</span>
+    public:
+        //中略
+    };
+</pre>
+</div>
+　この、<b>m_PlayerCsv</b>を操作して、<b>起動時の位置の読み取りや終了時の位置の保存</b>を行うわけですが、実際には、<b>Create()関数とデストラクタ</b>で行います。<br />
+　以下が<b>OnCreate()関数</b>です。
+<div class="box1">
+<pre>
+    void Player::OnCreate(){
+        <span class="red">wstring MediaPath = App::GetApp()->m_wstrRelativeDataPath;
+        //CSVファイルの決定
+        wstring CsvFilename = MediaPath + L"Player.csv";
+        m_PlayerCsv.SetFileName(CsvFilename);</span>
+        //初期位置などの設定
+        auto Ptr = AddComponent&lt;Transform>();
+        Ptr->SetScale(0.25f, 0.25f, 0.25f); //直径25センチの球体
+        Ptr->SetRotation(0.0f, 0.0f, 0.0f);
+        <span class="red">//位置は、もしcsvデータがあればそこから読み取る
+        if (!m_PlayerCsv.ReadCsv()){
+            //ファイルが存在しない
+            //初期位置
+            Ptr->SetPosition(0, 0.125f, 0);
+        }
+        else{
+            //プレイヤーデータがあった
+            vector&lt;wstring> PosVec;
+            m_PlayerCsv.GetSelect(PosVec,0,L"Player");
+            vector&lt;wstring> PosTokenVec;
+            Util::WStrToTokenVector(PosTokenVec, PosVec[0], L',');
+            //初期位置
+            Ptr->SetPosition(Vector3(PosTokenVec[1], PosTokenVec[2], PosTokenVec[3]));
+        }</span>
+
+        //中略
+
+    }
+</pre>
+</div>
+　最初に
+<div class="box1">
+<pre>
+        m_PlayerCsv.SetFileName(CsvFilename);
+</pre>
+</div>
+　のように、csvファイル名を渡します。<br />
+　そして、
+<div class="box1">
+<pre>
+        if (!m_PlayerCsv.ReadCsv()){
+</pre>
+</div>
+　と、読み取ります。<b>ReadCsv()関数</b>は、ファイルがないとfalseを返しますので、その時は、初期位置<b>0, 0.125f, 0</b>をポジションに渡します。<br />
+　もし読み取れた場合は、
+<div class="box1">
+<pre>
+            m_PlayerCsv.GetSelect(PosVec,0,L"Player");
+</pre>
+</div>
+　のように、必要な行を抽出します。<b>GetSelect()関数</b>は、いろんな使い方ができます。<br/>
+<br />
+　それを説明する前に、ゲーム終了時に<b>Player.csv</b>は保存されるわけですが、どのような形式で保存されるかを知る必要があります。<br />
+　以下は、プレイヤーを右前のボックスに乗ってる状態で終了させた場合の<b>Player.csv</b>の内容です。<br />
+　<b>DxBase2016</b>では、csvファイルのエンコードは必ず<b>ShiftJIS（Windowsで作成する場合はCP932）</b>で作成します。（UTF-8は未対応です）。通常、エクセル等で作成することが多いと思いますが、その場合は意識しなくても<b>CP932</b>になります。<br />
+<div class="box1">
+<pre>
+Player,13.605543,0.643750,9.458155
+</pre>
+</div>
+　このように、1行で構成されています。<b>「,」カンマ</b>で4つのブロックに区切られています。<br />
+　便宜上、この<b>「,」カンマで区切られたブロック</b>を<b>カラム</b>と呼ぶことにします。<br />
+　最初のカラムには<b>Player</b>という文字列が入ってます。2番目以降は、数字が3つ並んでいます。<br />
+　上記、<b>GetSelect()関数</b>の一番単純な使い方は、<b>何番目のカラムに指定する文字列が入ってる行を抜き出せ</b>というものです。なので
+<div class="box1">
+<pre>
+            m_PlayerCsv.GetSelect(PosVec,0,L"Player");
+</pre>
+</div>
+　は<b>PosVe配列に、0番目のカラムに、L"Player"という文字列が入っている行を抜き出せ</b>という意味になります。<br />
+　<b>PosVe配列</b>は<b>wstringa型のvector</b>を渡します。もし、0番目のカラムに、L"Player"という文字列が入っている行が複数あれば、その行をすべて取得できます。<br />
+　<b>GetSelect()</b>で、<b>PosVecにすべての行</b>を読みだすわけですが、ここで保存されているのは1行と決まっているので、<b>PosVec[0]</b>が目的の行になります。<br />
+　この段階で、<b>PosVec[0]</b>は、<b>「,」コンマ</b>も含んだ複数のカラムが入っている文字列になります。この文字列を、<b>「,」コンマでカラムに分割</b>するのには、ユーティリティ関数である<b>Util::WStrToTokenVector()関数</b>を利用します。<br />
+　<b>Util::WStrToTokenVector()関数</b>は、文字列を、<b>デリミタ（区切り文字）</b>で分割して、wstringの配列を作成してくれる関数です。
+<div class="box1">
+<pre>
+            Util::WStrToTokenVector(PosTokenVec, PosVec[0], L',');
+</pre>
+</div>
+　というのは、<b>PosVec[0]を、L','で分割して、PosTokenVecに入れなさい</b>という意味になります。<br />
+　この関数を実行すると、<b>PosTokenVecは4つの文字列の配列</b>になります。すなわち
+<div class="box1">
+<pre>
+PosTokenVec[0] == L"Player"
+PosTokenVec[1] == 終了時のX座標
+PosTokenVec[2] == 終了時のY座標
+PosTokenVec[3] == 終了時のZ座標
+</pre>
+</div>
+　ということです。ですので、WStrToTokenVector()によって作成された、PosTokenVec配列の、PosTokenVec[1]、PosTokenVec[2]、PosTokenVec[3]から、プレイヤーの初期値を読みだせばよいことになります。
+<div class="box1">
+<pre>
+            Ptr->SetPosition(Vector3(PosTokenVec[1], PosTokenVec[2], PosTokenVec[3]));
+</pre>
+</div>
+　によって、ポジションをTransformコンポーネントに渡します。<br />
+　<b>Vector3型</b>はコンストラクタに<b>3つの文字列</b>を渡すことができます。内部でfloat型に変換されて、<b>Vector3のインスタンス</b>を構築します。<br />
+　こうして作成した<b>Vector3</b>を引数として、<b>TransformのSetPosition()関数</b>を呼び出します。<br />
+<br/>
+<h4>プレイヤーの位置データの保存</h4>
+　このようにしてゲームが進むとプレイヤーの位置は変化するわけですが、サンプルでは終了時の座標を保存しています。<br />
+　具体的には、プレイヤーのデストラクタに記述があります。
+<div class="box1">
+<pre>
+    Player::~Player(){
+        auto Ptr = GetComponent&lt;Transform>();
+        wstring PlayerPosStr;
+        auto Pos = Ptr->GetPosition();
+        PlayerPosStr += L"Player,";
+        PlayerPosStr += Util::FloatToWStr(Pos.x, 6, Util::FloatModify::Fixed) + L",";
+        PlayerPosStr += Util::FloatToWStr(Pos.y, 6, Util::FloatModify::Fixed) + L",";
+        PlayerPosStr += Util::FloatToWStr(Pos.z, 6, Util::FloatModify::Fixed);
+
+        if (m_PlayerCsv.GetRowCount() &lt; 1){
+            m_PlayerCsv.AddRow(PlayerPosStr);
+        }
+        else{
+            m_PlayerCsv.UpdateRow(0, PlayerPosStr, false);
+        }
+        //CSVファイルの保存
+        <span class="red">m_PlayerCsv.SaveCsv(false);</span>
+    }
+</pre>
+</div>
+　ここではCsvFileクラスのメンバ関数である<b>SaveCsv()関数</b>を使います。<br/>
+<br />
+<h4>シークオブジェクトのデータ読み取り</h4>
+　CSVファイルという単純なデータ構造から、目的の行やカラムを取得できるようにするのが、<b>GetSelect()関数</b>の目的です。こうすることにより、たとえばひとつのcsvファイルに、別の目的のデータも一緒に保存しておくことが可能です。（使用する時に、必要な行のみ抽出すればよいのです）<br />
+　また、1行当たりのカラム数の制約もありません。ある行は5カラム、ある行は10カラムなどのcsvデータを管理することが可能になります。<br />
+　このことにより、コメント行など、処理上は必要でない行も記述することが可能です。<br />
+<br />
+　さて、この後、<b>ステージ上の追いかけるオブジェクト</b>もcsvから読みだしていますので、その説明を行います。ここでは、もっと複雑な<b>GetSelect()関数呼び出し</b>を例にとります。<br />
+　ステージ上に配置されている追い掛けるオブジェクトは、このサンプルでは、csvファイルから読みだしています。まず、そのcsvファイルの内容から調べてみましょう。<br />
+　mediaディレクトリの<b>GameStage.csv</b>が該当ファイルになります。内容は以下です。
+<div class="box1">
+<pre>
+タイプ,ステージNO,モード,ポジション
+SeekObject,1,Debug,0, 0, 0,
+SeekObject,1,Release,0, 0.125f, 10.0f,
+SeekObject,1,Debug,0, 0, 0,
+SeekObject,1,Release,10.0f, 0.125f, 0.0f,
+SeekObject,1,Debug,0, 0, 0,
+SeekObject,1,Release,-10.0f, 0.125f, 0.0f,
+SeekObject,1,Debug,0, 0, 0,
+SeekObject,1,Release,0, 0.125f, -10.0f,
+SeekObject,2,Debug,0, 0, 0,
+SeekObject,2,Release,0, 0.125f, 5.0f,
+SeekObject,2,Debug,0, 0, 0,
+SeekObject,2,Release,5.0f, 0.125f, 0.0f,
+SeekObject,2,Debug,0, 0, 0,
+SeekObject,2,Release,-5.0f, 0.125f, 0.0f,
+SeekObject,2,Debug,0, 0, 0,
+SeekObject,2,Release,0, 0.125f, -5.0f,
+</pre>
+</div>
+　ここでは、プレイヤーのcsvに比べ、いくらか複雑になっています。<br />
+　まず、<b>タイプ,ステージNO,モード,ポジション</b>という、明らかに処理上は不必要な行が入ってます。<br />
+　また、<b>0カラムめがSeekObject</b>になっている行を抽出しても、<b>1カラムめにステージNOが入り、2カラムめがDebugかRelease</b>に分けられ、1回の抽出（<b>GetSelect()関数呼び出し</b>）では、抽出できそうにありません。<br />
+　こんな時に利用するのが、<b>GetSelect()多重定義関数</b>です。<br />
+　<b>GetSelect()関数</b>は、前述したような、<b>何カラムめが何かになっている</b>行を抽出できますが、このほかに、<b>関数へのポインタを渡す</b>という抽出方法があります。つまり、抽出方法を指定できるのです。<br />
+　さらに言えば、C++11から採用された<b>ラムダ式（特にキャプチャつきラムダ式）</b>を渡せる、<b>GetSelect2()テンプレート関数</b>も使うことができます。<br />
+　それを、ひとつづつ解説します。<br />
+<br />
+　シークオブジェクトのデータ読み出しは<b>GameStage.cppのCreateSeekObject()関数</b>にあります。<br />
+　いろいろコメントになっているソースもありますが、まずは、今、実行されている形です。
+<div class="box1">
+<pre>
+    void GameStage::CreateSeekObject(){
+
+        wstring MediaPath = App::GetApp()->m_wstrRelativeDataPath;
+        //CSVファイルの決定
+        wstring CsvFilename = MediaPath + L"GameStage.csv";
+        //ローカル上にCSVファイルクラスを作成
+        CsvFile GameStageCsv(CsvFilename);
+        if (!GameStageCsv.ReadCsv()){
+            //ファイルは存在しなかった
+            // 初期化失敗
+            throw BaseException(
+                L"CSVファイルがありません。",
+                CsvFilename,
+                L"GameStage::CreateSeekObject()"
+                );
+        }
+        //追い掛けるオブジェクトデータを読み込み
+        //ラムダ式を利用
+        //わかりやすいようにインラインでは書かない
+        //以下は、wstringを引数に取りboolを返すラムダ式
+        //--------------------------------------------------------
+        <span class="red">auto func = [](const wstring& str)->bool{
+            //1行がコンマ区切りの文字列になっているので分解する
+            vector&lt; wstring > StrVec;
+            Util::WStrToTokenVector(StrVec, str, L',');
+            if (StrVec[0] == L"SeekObject" && StrVec[1] == L"1" && StrVec[2] == L"Release"){
+                return true;
+            }
+            else{
+                return false;
+            }
+        };</span>
+        //--------------------------------------------------------
+        //ワーク用の文字列の配列
+        vector&lt;wstring> SeekObjectVec;
+        //csvの中から、条件（ラムダ式で検査）で抽出
+        <span class="red">GameStageCsv.GetSelect(SeekObjectVec, func);</span>
+
+        //オブジェクトのグループを作成する
+        auto Group = CreateSharedObjectGroup(L"ObjectGroup");
+        //配置オブジェクトの作成
+        for (auto LineStr : SeekObjectVec){
+            //1行がコンマ区切りの文字列になっているので分解する
+            vector&lt; wstring > LineVec;
+            Util::WStrToTokenVector(LineVec, LineStr, L',');
+            //分解した配列からデータを取り出す
+            AddGameObject&lt;SeekObject>(Vector3(LineVec[3], LineVec[4], LineVec[5]));
+        }
+
+    }
+</pre>
+</div>
+　<b>GetSelect()関数</b>の多重定義版は、2番目の引数に<b>const wstring&を引数に取り、boolを返す関数へのポインタを渡す</b>というものです。<br />
+　つまり、<b>GetSelect()関数（多重定義版）</b>は、すべての行に対して、その指定された関数を実行し、戻り値がtrueだった場合に抽出行に加えます。<br />
+　この方法により、独自の検証方式を実装するとことができ、自由度は格段に上がります。<br />
+　また、例のように関数へのポインタは、<b>ラムダ式（ただしキャプチャ並びは使用しない）</b>を渡すこともできます。<br />
+　こういった、関数へのポインタを引数に取る関数は、<b>コールバック呼び出し関数</b>として、C言語でも広く利用されていました。しかしながら、C言語で利用する場合、<b>コールバック関数</b>はグローバルもしくはstatic関数として記述されなければならず、1度しか呼び出されなくても別に用意しなければなりません。<br />
+　そういう不便さ、あるいは関数内処理の隠ぺい化として、<b>C++11</b>では<b>ラムダ式</b>が登場しました。<br />
+　ですので、<b>ラムダ式</b>は局所的な<b>コールバック関数</b>と考えることができます。<br />
+　上記の例では、<b>ラムダ式</b>を、<b>GetSelect()関数</b>の外部に定義しています。<b>ラムダ式の学習</b>の1つの方法として、まず、このような記述をしてみるのは有効なことです。<br />
+　もちろん、<b>GetSelect()関数（多重定義版）</b>の<b>2つ目の引数</b>は関数へのポインタなので、C++11以前のように、スタティック関数やグローバル関数を指定するのも可能です。<br />
+<br/>
+　さて、このサンプルでは、さらに、コメントになってますが、ラムダ式のほかの記述方法が説明されています。<br />
+　まず、上記の<b>func</b>を<b>GetSelect()関数の内部</b>に記述する方法です。以下のように書きます。
+<div class="box1">
+<pre>
+    void GameStage::CreateSeekObject(){
+
+        //中略
+
+        //--------------------------------------------------------
+        //ワーク用の文字列の配列
+        vector&lt;wstring> SeekObjectVec;
+        //csvの中から、条件（ラムダ式で検査）で抽出
+        GameStageCsv.GetSelect(SeekObjectVec,
+            <span class="red">[](const wstring& str)->bool{
+                //1行がコンマ区切りの文字列になっているので分解する
+                vector&lt; wstring > StrVec;
+                Util::WStrToTokenVector(StrVec, str, L',');
+                if (StrVec[0] == L"SeekObject" && StrVec[1] == L"1" && StrVec[2] == L"Release"){
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }</span>
+        );
+
+        //中略
+
+    }
+</pre>
+</div>
+　赤くなってるところが<b>ラムダ式</b>の部分です。前の例だと<b>func</b>という変数を使ってましたが、こうすると必要がなくなります。<br />
+　ただ、ご覧のようにこれまでのC++の記述やC言語の記述に慣れ親しんだ方にとっては、結構難解な記述になります。可読性もあまりよくありませんので、前の例のように、<b>func</b>を記述す形の方がわかりやすければそれでもよいでしょう。<br />
+<br />
+<h4>キャプチャつきラムダ式</h4>
+　さて、これまで説明してきた<b>コールバック関数をラムダ式で実装</b>する方式だと、ラムダ式に渡すパラメータは決まってしまって、柔軟性に欠けます。<br />
+　というのは、<b>GetSelect()関数</b>に渡せるのは、<b>const wstring&を引数に取り、boolを返す関数へのポインタ</b>と決まってしまうからです。<br />
+　しかし、たとえば<b>ステージナンバー</b>など、動的にパラメータ化したい場合もあります。たとえば今回の例では、ステージナンバーによって、配置するオブジェクトの状態や、違うマップなどを作成する場合です。もちろん、csvファイルをステージごとに変える方法もありますが、同じcsvファイルの中に複数のステージデータを持つ場合など、ステージに渡されたパラメータをそのまま渡して、ラムダ式内で、該当ステージのデータを読み出すような記述は、必要なことがあります。<br />
+<br />
+　その解決方法として、ラムダ式には<b>キャプチャ並び</b>という強力な機能があります。<br />
+　この方式だと、ラムダ式にパラメータを渡すことができます。<br />
+　しかし、<b>キャプチャ並び</b>を使う場合、<b>GetSelect()関数</b>をそのまま使用することはできません。<b>GetSelect()関数</b>は通常のメンバ関数ですが、<b>キャプチャ並び</b>を使用する場合、<b>ラムダ呼び出し関数</b>を、<b>テンプレート関数</b>として記述する必要があります。<br />
+<br />
+　<b>CsvFileクラス</b>には<b>GetSelect2()</b>というテンプレート関数があり、<b>キャプチャ並び</b>を使う場合、こちらのテンプレート関数を使用します。<br/>
+　その使用例が、3つ目の例である以下のの方法です。コメントを外して実装します。
+<div class="box1">
+<pre>
+    void GameStage::CreateSeekObject(){
+
+        //中略
+
+        //--------------------------------------------------------
+        //ワーク用の文字列の配列
+        vector&lt;wstring> SeekObjectVec;
+        //キャプチャつきのラムダ式として以下のようにも書ける
+        wstring StageStr = L"1";
+        wstring ReleaseStr = L"Release";
+        <span class="red">auto func2 = [&](const wstring& str)->bool{
+            //1行がコンマ区切りの文字列になっているので分解する
+            vector&lt; wstring > StrVec;
+            Util::WStrToTokenVector(StrVec, str, L',');
+            if (StrVec[0] == L"SeekObject" && StrVec[1] == StageStr && StrVec[2] == ReleaseStr){
+                return true;
+            }
+            else{
+                return false;
+            }
+        };
+        //キャプチャつきラムダ式を使ったselect
+        GameStageCsv.GetSelect2(SeekObjectVec, func2);</span>
+
+        //中略
+
+    }
+</pre>
+</div>
+　この例では、<b>StageStr、ReleaseStr</b>という2つの変数を<b>ラムダ式内部</b>で使用しています。この際
+<div class="box1">
+<pre>
+        auto func2 = [<span class="red">&</span>](const wstring& str)->bool{
+            //1行がコンマ区切りの文字列になっているので分解する
+            vector&lt; wstring > StrVec;
+            Util::WStrToTokenVector(StrVec, str, L',');
+            if (StrVec[0] == L"SeekObject" && StrVec[1] == StageStr && StrVec[2] == ReleaseStr){
+                return true;
+            }
+            else{
+                return false;
+            }
+        };
+</pre>
+</div>
+　の中で、<b>&</b>が<b>ラムダ式側で参照で受ける</b>という意味になります。もちろん<b>StageStr</b>はwstringですが、ReleaseStrを渡さないのであれば、size_tやintで渡して、ラムダ式内でwstringに変換することも可能です。その際、キャプチャ並びは<b>&</b>を指定しなくてもよいでしょう（デフォルトは値渡しなので）。<br />
+<br />
+　さて、最後の例として、<b>キャプチャつきラムダ式</b>を、<b>GetSelect2()呼び出し内に記述する</b>というのがあります。
+<div class="box1">
+<pre>
+    void GameStage::CreateSeekObject(){
+
+        //中略
+
+        //ワーク用の文字列の配列
+        vector&lt;wstring> SeekObjectVec;
+        //キャプチャつきのラムダ式を一度に書く場合
+        wstring StageStr = L"1";
+        wstring ReleaseStr = L"Release";
+        //キャプチャつきラムダ式を使ったselect
+        GameStageCsv.GetSelect2(SeekObjectVec, 
+            [&](const wstring& str)->bool{
+                //1行がコンマ区切りの文字列になっているので分解する
+                vector&lt; wstring > StrVec;
+                Util::WStrToTokenVector(StrVec, str, L',');
+                if (StrVec[0] == L"SeekObject" && StrVec[1] == StageStr && StrVec[2] == ReleaseStr){
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
+        );
+
+        //中略
+
+    }
+</pre>
+</div>
+　これは、3番目の例の、<b>func2ラムダ式</b>を<b>GetSelect2()関数の引数内</b>に記述した例です。<br />
+　よく、ラムダ式の使用例として上げられるのはこの形が多いと思います。ただ、何も説明なしでこの例を出されてもちょっとびっくりするかもしれません。<br />
+<br />
+<h4>キャプチャつきラムダ式の呼び出し関数</h4>
+　最後に、<b>キャプチャつきラムダ式を呼びだすテンプレート関数</b>はどうなっているのか、実際に<b>GetSelect2()テンプレート関数</b>の実体を紹介します。<br />
+<div class="box1">
+<pre>
+        template&lt;typename Fct>
+        void GetSelect2(vector&lt; wstring >& RetVec, Fct f){
+            //渡された配列に値が入ってる場合があるのでクリア
+            RetVec.clear();
+            auto& CsvVec = GetCsvVec();
+            size_t sz = CsvVec.size();
+            for (size_t i = 0; i &lt; sz; i++){
+                //コールバック関数を呼び出す
+                if (f(CsvVec[i])){
+                    //条件があれば追加
+                    RetVec.push_back(CsvVec[i]);
+                }
+            }
+        }
+</pre>
+</div>
+　こうしてみると、テンプレート化することで、<b>Fct型</b>という関数を定義しているのがわかります。テンプレートですのでこの関数は、コンパイル時に実体が作成されます。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_12.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="30_14.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

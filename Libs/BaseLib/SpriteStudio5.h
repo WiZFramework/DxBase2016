@@ -854,9 +854,6 @@ namespace basedx11{
 		//スプライトかどうか(Getterのみ)
 		bool GetSpriteType() const;
 		bool IsSpriteType() const;
-		//スプライトにおける、1メートル当たりのピクセル（デフォルト8）
-		float GetSpritePixelParMeter() const;
-		void SetSpritePixelParMeter(float f);
 
 		void SetTextureOnlyNoLight(bool b);
 		bool GetTextureOnlyNoLight() const;
@@ -902,10 +899,6 @@ namespace basedx11{
 		//スプライトかどうか(Getterのみ)
 		bool GetSpriteType() const;
 		bool IsSpriteType() const;
-		//スプライトにおける、1メートル当たりのピクセル（デフォルト8）
-		float GetSpritePixelParMeter() const;
-		void SetSpritePixelParMeter(float f);
-
 
 		//現在選択されているアニメーションがループするかどうかを得る
 		bool IsLooped() const;

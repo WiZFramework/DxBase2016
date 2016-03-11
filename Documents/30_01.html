@@ -1,0 +1,384 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３０１．スプライトとスクエア</h3>
+<br />
+<h4>スプライトとスクエアの違い</h4>
+　<b>DxBase2015</b>は、平面の表現に<b>スプライトとスクエア</b>という2つの方式を持ってます。<br />
+　<b>スプライト</b>は2次元上の平面です。ですので、座標系はビューそのものが基準になります。<br/>
+　それに対して、<b>スクエア</b>は3次元上の平面です。厚みはありませんが、回転したり、遠近法を使って描画することができます。<br />
+　まず、この違いを理解しましょう。<br/>
+<br />
+　<b>Sample301</b>を開いて、リビルド実行すると以下のような画面が現れます。ベースになってるのはチュートリアル008ですが、センター中央に幅が変化するスプライトや、数字、バー（左下）が出現します。また、追いかけるオブジェクトが自分のナンバーを抱えてます。
+<p>&nbsp;</p>
+<img src="img/3001a.jpg" width="80%"/>
+<p>図3001a</p>
+<p>&nbsp;</p>
+　<b>スプライト</b>は、カメラを変化させてもそこから動きません。<br />
+　それに対して、追いかけるオブジェクトについている数字はカメラを動かすと表示位置が変化します。そして、追いかけるオブジェクトはたとえば上から見ると上からの視点になりますが、数字は常にカメラの方向を向いてます。<br />
+<br />
+<h4>シンプルスプライト</h4>
+　これらのオブジェクトは<b>Charactor.h、cpp</b>に記述されています。中央上部の、幅が変化するスプライトは、<b>SimpleSprite</b>というクラスです。以下はこのクラスの<b>OnCreate()関数</b>です。<br />
+<div class="box1">
+<pre>
+    void SimpleSprite::OnCreate(){
+        auto PtrTransform = AddComponent&lt;Transform>();
+        PtrTransform->SetPosition(m_StartPos);
+        PtrTransform->SetScale(1.0f, 1.0f, 1.0f);
+        PtrTransform->SetRotation(0.0f, 0.0f, 0.0f);
+        <span class="red">//スプライトをつける
+        auto PtrSprite = AddComponent&lt;PCTSpriteDraw>(Vector2(128.0f, 128.0f), 
+            Color4(1.0f, 1.0f, 1.0f, 1.0f));</span>
+        PtrSprite->SetTextureResource(L"WALL_TX");
+        //センター原点
+        PtrSprite->SetSpriteCoordinate(SpriteCoordinate::m_CenterZeroPlusUpY);
+        //両面描画
+        PtrSprite->SetRasterizerState(RasterizerState::CullNone);
+    }
+</pre>
+</div>
+　オブジェクトをスプライトにするためには描画コンポーネントを<b>PCTSpriteDraw</b>などにします。このコンポーネントは、頂点が<b>ポジション、色、テクスチャUV</b>を持つメッシュを描画するコンポーネントです。<br />
+　スプライト用の描画コンポーネントは他に、<b>PCSpriteDraw（ポジションと色）、PTSpriteDraw（ポジションとテクスチャUV）</b>用のものがあります。<br />
+　スプライトはライティングには影響されませんので、法線が含まれる頂点用のは用意されていません。<br />
+　さて上記のソースですが、<b>m_StartPos</b>は初期値として渡される値ですが、
+<div class="box1">
+<pre>
+        //センター原点
+        PtrSprite->SetSpriteCoordinate(SpriteCoordinate::m_CenterZeroPlusUpY);
+</pre>
+</div>
+　の設定値に影響を受けます。<b>SpriteCoordinate::m_CenterZeroPlusUpY</b>は<b>センター原点の上方Y軸プラス</b>です。通常の3D描画と似ている単位系です。<br/>
+　このほかに、<b>SpriteCoordinate::m_LeftBottomZeroPlusUpY（左下原点でY軸上向きプラス）</b>あるいは、<b>SpriteCoordinate::m_LeftTopZeroPlusDownY（左上原点でY軸下向きプラス）</b>が選べます。<br />
+　ここでは、<b>m_StartPos</b>はGameStageから<b>Vector3(0.0f, 300.0f, 0.0f)</b>が渡されています。Y軸が300.0fでXとZは0となっています。<b>スプライトの単位はピクセル</b>です。ですから、中央より300.0fピクセル上部に初期位置が設定されます。<br />
+　<b>ピクセル</b>が単位系ですが、これは、<b>各ビュー</b>内のものです。このサンプルはビューは、アプリケーション表示領域全体を使ってますので、センターが、全体のセンターですが、例えば分割ビューの場合、センターはそのビュー内のセンターになります。<br/>
+　このスプライトは、幅が変化します。これはスケーリングのxを変化させることで実装します。<br />
+　その記述は、<b>OnUpdate()関数</b>にあります。<br />
+<div class="box1">
+<pre>
+    void SimpleSprite::OnUpdate(){
+        //前回のターンからの時間
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        m_TotalTime += ElapsedTime;
+
+        auto PtrTransform = AddComponent&lt;Transform>();
+        <span class="red">PtrTransform->SetScale(cos(m_TotalTime), 1.0f,1.0f);</span>
+    }
+</pre>
+</div>
+　赤くなっているところでスケーリングのxを変化させています。<br />
+　変化の計算に<b>cos(m_TotalTime)</b>とコサインを使用しています。コサインはサインのように、-1.0fから1.0fの間を行ったり来たりします。つまり<b>マイナスの値</b>になることもあるわけですが、これは鏡像を作成するのに役立ちます。<br />
+　例えば、キャラクターがあって、そのキャラが左向きのものしか用意されなかったときに、左右に移動するときに向きを変えたい場合があります。このような場合は、スケーリングのxをマイナス値（例えば-1.0f）にすることで対応できます。<br />
+　グラフィックを別に書いてもらったり、画像処理で逆むきのテクスチャを別に用意するよりはよほどスマートな方法です。<br />
+　ただこの場合、キャラクターが、左利きで常に剣は右わきに収めている、みたいな設定の場合は使えませんので注意しましょう。<br />
+<br />
+<h4>数字スプライト</h4>
+　数字のスプライトは<b>NumberSprite</b>クラスです。左側にあり、0から9までの値を変化させます。<br />
+　以下は<b>OnCreate()関数</b>です。
+<div class="box1">
+<pre>
+    //初期化
+    void NumberSprite::OnCreate(){
+        auto PtrTransform = AddComponent&lt;Transform>();
+        PtrTransform->SetPosition(m_StartPos);
+        PtrTransform->SetScale(1.0f, 1.0f, 1.0f);
+        PtrTransform->SetRotation(0.0f, 0.0f, 0.0f);
+        //スプライトをつける
+        auto PtrSprite = AddComponent&lt;PCTSpriteDraw>(Vector2(128.0f,128.0f),
+            Color4(1.0f, 1.0f, 1.0f, 1.0f));
+        PtrSprite->SetTextureResource(L"NUMBER_TX");
+        //透明処理
+        SetAlphaActive(true);
+        //左上原点
+        PtrSprite->SetSpriteCoordinate(SpriteCoordinate::m_LeftTopZeroPlusDownY);
+        //スプライトの中のメッシュからバックアップの取得
+        <span class="red">auto& SpVertexVec 
+        = PtrSprite->GetMeshResource()->GetBackupVerteces&lt;VertexPositionColorTexture>();
+        //各数字ごとにUV値を含む頂点データを配列化しておく
+        for (size_t i = 0; i &lt; 10; i++){
+            float from = ((float)i) / 10.0f;
+            float to = from + (1.0f / 10.0f);
+            vector&lt;VertexPositionColorTexture> NumVirtex =
+            {
+                //左上頂点
+                VertexPositionColorTexture(
+                SpVertexVec[0].position,
+                Color4(1.0f, 1.0f, 1.0f, 1.0f),
+                Vector2(from, 0)
+                ),
+                //右上頂点
+                VertexPositionColorTexture(
+                SpVertexVec[1].position,
+                Color4(1.0f, 1.0f, 1.0f, 1.0f),
+                Vector2(to, 0)
+                ),
+                //左下頂点
+                VertexPositionColorTexture(
+                SpVertexVec[2].position,
+                Color4(1.0f, 1.0f, 1.0f, 1.0f),
+                Vector2(from, 1.0f)
+                ),
+                //右下頂点
+                VertexPositionColorTexture(
+                SpVertexVec[3].position,
+                Color4(1.0f, 1.0f, 1.0f, 1.0f),
+                Vector2(to, 1.0f)
+                ),
+            };
+            m_NumberVertexVec.push_back(NumVirtex);
+        }</span>
+    }
+</pre>
+</div>
+　このオブジェクトは、<b>NUMBER_TX</b>というテクスチャを持ちます。数字が0から10まで並んでいるテクスチャで、これを経過時間に合わせて表示するUV値を変えます。そのデータを<b>m_NumberVertexVec</b>という2次元配列にデータ化しているわけです。赤くなっている部分でその処理をしています。<br />
+　またこのスプライトは<b>座標系を左上始点（Y方向下向き）</b>にしています。<br />
+　実際の数字の切り替えは以下のように<b>OnUpdate()関数</b>で行ってます。
+<div class="box1">
+<pre>
+    void NumberSprite::OnUpdate(){
+        //前回のターンからの時間
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        m_TotalTime += ElapsedTime;
+        size_t Num = (size_t)m_TotalTime;
+        Num = Num % 10;
+        auto PtrSprite = GetComponent&lt;PCTSpriteDraw>();
+        auto MeshRes = PtrSprite->GetMeshResource();
+        //動的にUV値が変わる頂点を設定する
+        <span class="red">MeshRes->UpdateVirtexBuffer(m_NumberVertexVec[Num]);</span>
+    }
+</pre>
+</div>
+　赤くなってるところは、動的にSpriteの頂点を変更しているところです。OnCreate()時に作成した配列のその数字に対応するインデックスを渡してます。スプライト系の描画コンポーネントは、通常の３Ｄの描画コンポーネントと違い、内部にメッシュを保持しています。<b>UpdateVirtexBuffer()関数呼び出し</b>でそれを変更するわけです。<br />
+<br />
+<h4>バースプライト</h4>
+　数字スプライトの左側にあるバーは、ライフとか時間経過とかに利用できるインターフェイスです。<b>BarSpriteクラス</b>がその実装です。数字スプライトと同じように、<b>PCTSpriteDrawコンポーネント</b>を実装します。<br />
+　以下は、<b>OnCreate()関数</b>です。
+<div class="box1">
+<pre>
+    void BarSprite::OnCreate(){
+        auto PtrTransform = AddComponent&lt;Transform>();
+        PtrTransform->SetPosition(m_StartPos);
+        PtrTransform->SetScale(1.0f, 1.0f, 1.0f);
+        PtrTransform->SetRotation(0.0f, 0.0f, 0.0f);
+        //スプライトをつける
+        //すぐに頂点を変更してしまうので、サイズは適当でよい
+        <span class="red">auto PtrSprite = AddComponent&lt;PCTSpriteDraw>(Vector2(SpriteWidth, SpriteHeight), 
+            Color4(1.0f, 1.0f, 1.0f, 1.0f));
+        //左上
+        m_BarVirtexVec.push_back(
+            VertexPositionColorTexture(
+            Vector3(0.0f, SpriteHeight, 0),
+                Color4(1.0f, 1.0f, 1.0f, 1.0f),
+                Vector2(0, 0))
+            );
+        //右上
+        m_BarVirtexVec.push_back(
+            VertexPositionColorTexture(
+            Vector3(SpriteWidth, SpriteHeight, 0),
+            Color4(1.0f, 1.0f, 1.0f, 1.0f),
+            Vector2(1.0f, 0))
+            );
+        //左下
+        m_BarVirtexVec.push_back(
+            VertexPositionColorTexture(
+            Vector3(0.0f, 0.0f, 0),
+            Color4(1.0f, 1.0f, 1.0f, 1.0f),
+            Vector2(0, 1.0f))
+            );
+        //右下
+        m_BarVirtexVec.push_back(
+            VertexPositionColorTexture(
+            Vector3(SpriteWidth, 0.0f, 0),
+            Color4(1.0f, 1.0f, 1.0f, 1.0f),
+            Vector2(1.0f, 1.0f))
+            );
+        //スプライトの中のメッシュの取得
+        auto MeshRes = PtrSprite->GetMeshResource();
+        //頂点を設定する
+        MeshRes->UpdateVirtexBuffer(m_BarVirtexVec);</span>
+
+        PtrSprite->SetTextureResource(L"BAR_TX");
+        //左下原点
+        PtrSprite->SetSpriteCoordinate(SpriteCoordinate::m_LeftBottomZeroPlusUpY);
+    }
+</pre>
+</div>
+　このスプライトは、左下を基準に表示されるので、操作しやすいように頂点のポジションを変更しています。その計算をスプライトの幅と高さを基準に変更しています。<br />
+　また、バーの上げ下げを<b>頂点を変更することで</b>実装してます。以下がその処理です<b>OnUpdate()関数</b>に記述します。<br />
+　以下は<b>OnUpdate()関数</b>です。動的に頂点を変更しています。
+<div class="box1">
+<pre>
+    void BarSprite::OnUpdate(){
+        //前回のターンからの時間
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        m_TotalTime += ElapsedTime * 2.0f;
+        //sinは-1.0から1.0まで取りうるので調整
+        float v = cos(m_TotalTime) * 0.5f + 0.5f;
+        float y = SpriteHeight - SpriteHeight * v;
+
+        m_BarVirtexVec[0].position.y = y;
+        m_BarVirtexVec[0].textureCoordinate.y = v;
+        m_BarVirtexVec[1].position.y = y;
+        m_BarVirtexVec[1].textureCoordinate.y = v;
+
+        auto PtrSprite = GetComponent&lt;PCTSpriteDraw>();
+
+        //スプライトの中のメッシュの取得
+        auto MeshRes = PtrSprite->GetMeshResource();
+        //頂点を設定する
+        MeshRes->UpdateVirtexBuffer(m_BarVirtexVec);
+    }
+</pre>
+</div>
+　このように、スプライトはスケーリングやUV値で大きさや表示するテクスチャ内の部分を指定できますが
+、直接頂点位置を変更しても実装できます。計算方法やテクスチャの形によって、柔軟に考えるとよいでしょう。<br />
+<br />
+<h4>数字のスクエア</h4>
+　ここまで3つはスプライトでしたが、最後に、追いかけるオブジェクトの上に表示される番号です。これは、<b>スクエア</b>を使って実装します。<b>NumberSquare</b>が実装クラスです。<br />
+　以下は、<b>OnCreate()関数</b>です。コンストラクタで、関連づけられる追いかけるオブジェクトのポインタが渡されています。このクラス内では<b>weak_ptr</b>として保持しています。<b>m_SeekObject</b>が変数名です。この変数はヘッダ部に宣言されています。
+<div class="box1">
+<pre>
+    void NumberSquare::OnCreate(){
+        auto PtrTransform = AddComponent&lt;Transform>();
+        if (!m_SeekObject.expired()){
+            auto SeekPtr = m_SeekObject.lock();
+            auto SeekTransPtr = SeekPtr->GetComponent&lt;Transform>();
+            auto Pos = SeekTransPtr->GetPosition();
+            Pos.y += 0.75f;
+            PtrTransform->SetPosition(Pos);
+            PtrTransform->SetScale(1.0f, 1.0f, 1.0f);
+            PtrTransform->SetQuaternion(SeekTransPtr->GetQuaternion());
+            //変更できるスクエアリソースを作成
+
+            //頂点配列
+            <span class="red">vector&lt;VertexPositionNormalTexture> vertices;
+            //インデックスを作成するための配列
+            vector&lt;uint16_t> indices;
+            //Squareの作成(ヘルパー関数を利用)
+            VertexUtil::CreateSquare(1.0f, vertices, indices);</span>
+            //UV値の変更
+            float from = ((float)m_Number) / 10.0f;
+            float to = from + (1.0f / 10.0f);
+            //左上頂点
+            vertices[0].textureCoordinate = Vector2(from, 0);
+            //右上頂点
+            vertices[1].textureCoordinate = Vector2(to, 0);
+            //左下頂点
+            vertices[2].textureCoordinate = Vector2(from, 1.0f);
+            //右下頂点
+            vertices[3].textureCoordinate = Vector2(to, 1.0f);
+            //頂点の型を変えた新しい頂点を作成
+            <span class="red">vector&lt;VertexPositionColorTexture> new_vertices;
+            for (auto& v : vertices){
+                VertexPositionColorTexture nv;
+                nv.position = v.position;
+                nv.color = Color4(1.0f, 1.0f, 1.0f, 1.0f);
+                nv.textureCoordinate = v.textureCoordinate;
+                new_vertices.push_back(nv);
+            }
+            //新しい頂点を使ってメッシュリソースの作成
+            m_SquareMeshResource 
+            = MeshResource::CreateMeshResource&lt;VertexPositionColorTexture>(
+                new_vertices, indices, true);</span>
+
+            auto DrawComp = AddComponent&lt;PCTStaticDraw>();
+            DrawComp->SetMeshResource(m_SquareMeshResource);
+            DrawComp->SetTextureResource(L"NUMBER_TX");
+            SetAlphaActive(true);
+        }
+    }
+</pre>
+</div>
+　まず、<b>m_SeekObject</b>が有効かどうか確認します。無効であればスクエアは作成しません。<br />
+　ここでは、<b>Transform</b>を<b>m_SeekObject</b>に合わせて初期化した後、<b>頂点を変更できるスクエア</b>を作成して、それをメッシュリソースにしています。ここでは、メッシュはアプリケーションに登録してません。それは頂点が変更されるので、共有が難しいからです。<br />
+　ここで使用している<b>PCTStaticDraw</b>というコンポーネントは、<b>位置、色、テクスチャ</b>を持つ頂点用の描画コンポーネントです。スプライトの描画コンポーネントはメッシュは自動的に作成しますが、３Ｄ用のコンポーネントはメッシュを指定しなければいけません。ここでは、デフォルトで用意されているものは頂点構成が違うので、自作する必要があります。<br />
+　メッシュを自作するにあたって、ユーティリティ関数で<b>VertexPositionNormalTextureフォーマット</b>の頂点配列を作成し、それを<b>VertexPositionColorTextureフォーマット</b>に変更します。上の赤くなっている部分で頂点配列を作成し、下の赤くなっている部分（以下抜粋）でフォーマットを変更しています。
+<div class="box1">
+<pre>
+            <span class="red">vector&lt;VertexPositionColorTexture> new_vertices;
+            for (auto& v : vertices){
+                VertexPositionColorTexture nv;
+                nv.position = v.position;
+                nv.color = Color4(1.0f, 1.0f, 1.0f, 1.0f);
+                nv.textureCoordinate = v.textureCoordinate;
+                new_vertices.push_back(nv);
+            }
+            //新しい頂点を使ってメッシュリソースの作成
+            m_SquareMeshResource 
+            = MeshResource::CreateMeshResource&lt;VertexPositionColorTexture>(
+                new_vertices, indices, true);</span>
+</pre>
+</div>
+　以下はOnUpdate()関数です。ここではちょっと珍しい処理をしています。
+<div class="box1">
+<pre>
+    void NumberSquare::OnUpdate(){
+        if (!m_SeekObject.expired()){
+            auto SeekPtr = m_SeekObject.lock();
+            auto SeekTransPtr = SeekPtr->GetComponent&lt;Transform>();
+
+            auto PtrTransform = GetComponent&lt;Transform>();
+            auto Pos = SeekTransPtr->GetPosition();
+            Pos.y += 0.75f;
+            PtrTransform->SetPosition(Pos);
+            PtrTransform->SetScale(1.0f, 1.0f, 1.0f);
+
+            auto PtrCamera = GetStage()->GetCamera(0);
+
+            Quaternion Qt;
+            <span class="red">//向きをビルボードにする
+            Qt.Billboard(PtrCamera->GetAt() - PtrCamera->GetEye());</span>
+
+            //向きをフェイシングにする場合は以下のようにする
+            // Qt.Facing(Pos - PtrCamera->GetEye());
+            //向きをフェイシングYにする場合は以下のようにする
+            // Qt.FacingY(Pos - PtrCamera->GetEye());
+            //向きをシークオブジェクトと同じにする場合は以下のようにする
+            // Qt = SeekTransPtr->GetQuaternion();
+
+            PtrTransform->SetQuaternion(Qt);
+
+        }
+    }
+</pre>
+</div>
+　ここでは、<b>Transformの回転</b>を決定するのに、
+<div class="box1">
+<pre>
+    //向きをビルボードにする
+    Qt.Billboard(PtrCamera->GetAt() - PtrCamera->GetEye());
+</pre>
+</div>
+　という処理を行ってます。<b>Quaternion</b>には、<b>Billboard</b>というメンバ関数があり、この関数に、カメラ位置と、カメラ注目点を渡すと、それと直行した角度を返します。<br />
+　このほかに、<b>Quaternion</b>には<b>Facing()、FacingY()</b>があり、それぞれ<b>完全にカメラを向く、とY軸だけカメラを向く</b>という角度を計算します。<br />
+　<b>Transformの回転</b>には、その結果を渡すことができます。<br />
+　この処理で、番号スクエアは常に、カメラに視線と直角に見えるように表示できます。<br />
+　この<b>ビルボード、フェイシング、フェイシングY</b>はパーティクルエフェクトでも重要になりますので覚えておきましょう。
+
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="index.html">目次</a></li>
+<li><a href="30_02.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

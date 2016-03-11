@@ -1,0 +1,142 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３０２．パーティクルエフェクト</h3>
+<br />
+<h4>パーティクルエフェクトとは</h4>
+　ゲームにはエフェクトがつきものです。何かと何かが衝突したとき、何かが爆発したとき、飛んでいく砲弾や光線の周りに表示される効果など、エフェクトなしには、ゲームの魅力も半減してしまうでしょう。<br />
+　<b>Sample302</b>は、<b>DxBase2016</b>における、一番簡単なエフェクトの作成方法である<b>パーティクルエフェクト</b>のサンプルです。<br/>
+　サンプルを開き、リビルドして実行すると以下の画面が現れます。いつもの画面ですが、プレイヤーを何かにぶつけるとそこで<b>白いスパーク</b>が発生します
+<p>&nbsp;</p>
+<img src="img/3002a.jpg" width="80%"/>
+<p>図3002a</p>
+<p>&nbsp;</p>
+　このスパークを実装しているのは、<b>MultiSparkクラス</b>です。<b>Charactor.h、cpp</b>に記述があります。<br />
+　<b>MultiSparkクラス</b>は、<b>MultiParticleクラス</b>の派生クラスです。このクラスは、<b>複数の場所で発生するエフェクト</b>を管理します。これまでのサンプルと違って、今回は<b>OnCreate()関数</b>は記述しません。このクラスは、自分自身のTransformやDrawコンポーネントはあまり重要ではありません。（もちろんOnCreate()関数を記述しても問題ありません。何かの初期化に使うこともできます）。<br />
+　そのかわり、<b>InsertSpark()</b>という関数を持ってます。仮想関数ではないので、関数名は重要ではありません。この関数は、ある位置で<b>エフェクトを生成する</b>という仕事をします。
+<div class="box1">
+<pre>
+    void MultiSpark::InsertSpark(const Vector3& Pos){
+        <span class="red">auto ParticlePtr = InsertParticle(4);
+        ParticlePtr->SetEmitterPos(Pos);
+        ParticlePtr->SetTextureResource(L"SPARK_TX");
+        ParticlePtr->SetMaxTime(0.5f);</span>
+        vector&lt;ParticleSprite>& pSpriteVec = ParticlePtr->GetParticleSpriteVec();
+        for (auto& rParticleSprite : ParticlePtr->GetParticleSpriteVec()){
+            rParticleSprite.m_LocalPos.x = Util::RandZeroToOne() * 0.1f - 0.05f;
+            rParticleSprite.m_LocalPos.y = Util::RandZeroToOne() * 0.1f;
+            rParticleSprite.m_LocalPos.z = Util::RandZeroToOne() * 0.1f - 0.05f;
+            //各パーティクルの移動速度を指定
+            rParticleSprite.m_Velocity = Vector3(
+                rParticleSprite.m_LocalPos.x * 5.0f,
+                rParticleSprite.m_LocalPos.y * 5.0f,
+                rParticleSprite.m_LocalPos.z * 5.0f
+                );
+            <span class="red">//色の指定
+            rParticleSprite.m_Color = Color4(1.0f, 1.0f, 1.0f, 1.0f);</span>
+        }
+    }
+</pre>
+</div>
+　赤くなっているところは、パーティクルを作成し、テクスチャとパーティクルの数と制限時間を設定します。<br/>
+　テクスチャは<b>GameStage.cpp</b>でリソース化されています。ここでは丸い形状を使ってますが、変えることもできます。<br />
+　そのあとはこの時作成されるパーティクル1つ1つの値の設定をします。重要なのは、<b>m_LocalPosとm_Velocity</b>です。このほかにスケーリングも設定できます。<br />
+　ここで設定する値は、<b>発射位置（エミッターといいます）</b>から見た相対位置です。<br />
+　最後の
+<div class="box1">
+<pre>
+            <span class="red">//色の指定
+            rParticleSprite.m_Color = Color4(1.0f, 1.0f, 1.0f, 1.0f);</span>
+</pre>
+</div>
+　は、パーティクルの色を設定します。ここでは<b>Color4(1.0f, 1.0f, 1.0f, 1.0f)</b>が設定されているので、白いスパークになります。<br />
+　これを、たとえば
+<div class="box1">
+<pre>
+            <span class="red">//色の指定
+            rParticleSprite.m_Color = Color4(1.0f, 0.5f, 1.0f, 1.0f);</span>
+</pre>
+</div>
+　とすると
+<p>&nbsp;</p>
+<img src="img/3002b.jpg" width="80%"/>
+<p>図3002b</p>
+<p>&nbsp;</p>
+　のようになります。
+　ここではテクスチャそのものに色を付けてませんが、テクスチャに色を付けた場合、ここの指定色とテクスチャ色の合成された色になります。<br />
+<br />
+　このように、<b>InsertSpark()関数</b>を実装したら、あとは、<b>どこでエフェクトを発射するか</b>です。<br />
+　サンプルでは、プレイヤーが何かに衝突したときに発射します。<b>Player.cppのPlayer::OnCollision()関数</b>に記述があります。
+<div class="box1">
+<pre>
+    void Player::OnCollision(const shared_ptr&lt;GameObject>& other){
+        //中略
+        //スパークの放出
+        auto PtrSpark = GetStage()->GetSharedGameObject&lt;MultiSpark>(L"MultiSpark", false);
+        if (PtrSpark){
+            PtrSpark->InsertSpark(GetComponent&lt;Transform>()->GetPosition());
+        }
+    }
+</pre>
+</div>
+　というかんじです。エフェクトにプレイヤーの現在位置を渡します。ここがエミッターになります。<br />
+<br />
+　さて、このサンプルでは、各パーティクルの動きは、Insert時に決定し、動的には変化しません。たとえば、動的に<b>m_Velocity</b>などを変化させたり、動的に色を変化させるにはどうしたらいいでしょうか？<br />
+<br />
+　そんな時は、<b>MultiSpark::OnUpdate()</b>を多重定義して記述します。ヘッダファイルに宣言後、たとえば以下のように記述します。
+<div class="box1">
+<pre>
+    void MultiSpark::OnUpdate(){
+        //前回のターンからの時間
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        for (auto ParticlePtr : GetParticleVec()){
+            //トータル時間に加算
+            ParticlePtr->AddTotalTime(ElapsedTime);
+            for (auto& rParticleSprite : ParticlePtr->GetParticleSpriteVec()){
+                if (rParticleSprite.m_Active){
+                    //もしアクティブなら
+                    <span class="red">//移動速度に従って移動させる
+                    rParticleSprite.m_LocalPos += rParticleSprite.m_Velocity * ElapsedTime;
+                    //色を変化させる(だんだん黒く、より透明になる)
+                    rParticleSprite.m_Color *= 0.95f;</span>
+                    if (ParticlePtr->GetTotalTime() >= ParticlePtr->GetMaxTime()){
+                        //制限時間になったら
+                        rParticleSprite.m_Active = false;
+                    }
+                }
+            }
+        }
+    }
+</pre>
+</div>
+　これで、エフェクトはだんだん黒くなり消えるようになります。<br />
+　動的に変更する位置（ローカル座標）の<b>rParticleSprite.m_LocalPos</b>はインサートに設定した速度をもとに計算していますが、自由に計算して設定しても問題ありません。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_01.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="30_03.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

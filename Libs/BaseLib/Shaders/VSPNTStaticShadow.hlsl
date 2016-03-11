@@ -21,18 +21,6 @@ cbuffer SimpleConstantBuffer : register(b0)
 	float4x4 LightProjection	: packoffset(c22);
 };
 
-/*
-struct PSPNTInputShadow
-{
-	float4 position : SV_Position;
-	float3 norm   : NORMAL0;
-	float3 lightRay		: NORMAL1;
-	float3 lightView : NORMAL2;
-	float2 tex : TEXCOORD0;
-	float4 posLWVP  : POSITION1;
-	float4 lightSpacePos : POSITION2;
-};
-*/
 
 PSPNTInputShadow main(VSPNTInput input)
 {

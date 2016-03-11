@@ -1,0 +1,123 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３０３．画面分割１</h3>
+<br />
+<h4>画面分割が必要になるとき</h4>
+　複数のプレイヤーでプレイするとき、あるいは、ミニマップや、別の角度からのカメラで表示したい時など、画面分割は頻繁に行われます。<br />
+　<b>Sample303</b>はそんな画面分割の方法を説明します。<br />
+　ただし、<b>Sample303</b>は１つの画面を複数の方向から見る場合に有効です。たとえば、スプライトは画面分割の外において、分割に関係なく共有して使いたい場合は、<b>Sample304</b>の方法を試してください。<br />
+　<b>Sample303</b>のソリューションを開き、リビルドして実行すると、以下の画面が現れます。<br />
+<p>&nbsp;</p>
+<img src="img/3003a.jpg" width="80%"/>
+<p>図3003a</p>
+<p>&nbsp;</p>
+　左がいつものようにコントローラで操作できる画面、右は固定カメラで、中央上部の小さい画面は、ミニマップ風で真上から見ています。<br />
+　ようは、１つの画面を３方向から見ている感じになります。<br />
+　このような画面分割を実装するためには、<b>複数のビュー</b>を使います。<br />
+　具体的には、チュートリアル006に、<b>GameStage.cppのGameStage::CreateViews()関数</b>にビューを追加するだけで、このサンプルは出来上がります。
+<div class="box1">
+<pre>
+    //ビュー類の作成
+    void GameStage::CreateViews(){
+        //最初にデフォルトのレンダリングターゲット類を作成する
+        //パラメータの2048.0fはシャドウマップのサイズ。大きいほど影が細かくなる（4096.0fなど）
+        //影を細かくするとメモリを大量に消費するので注意！
+        CreateDefaultRenderTargets(2048.0f);
+        //影のビューサイズの設定。この値を小さくすると影が表示される範囲が小さくなる。
+        //値が小さいほうが影は細かくなる
+        //スタティック変数なので一度設定したらその値はステージを超えて保持される。
+        Shadowmap::SetViewSize(32.0f);
+        //マルチビューコンポーネントの取得
+        auto PtrMultiView = GetComponent&lt;MultiView>();
+        //マルチビューにビューの追加
+        auto PtrView = PtrMultiView->AddView();
+        //ビューの矩形を設定（ゲームサイズの縦半分）
+        Rect2D&lt;float> rect(0, 0, (float)640, (float)800);
+        //ビューの背景色
+        Color4 ViewBkColor(0.0f, 0.125f, 0.3f, 1.0f);
+        //最初のビューにパラメータの設定
+        <span class="red">PtrView->ResetParamaters&lt;LookAtCamera, MultiLight>(rect, ViewBkColor, 1, 0.2f, 1.0f);</span>
+        //最初のビューのビューのライトの設定
+        auto PtrLight = PtrView->GetMultiLight()->GetLight(0);
+        PtrLight->SetPositionToDirectional(-0.25f, 1.0f, -0.25f);
+        //ビューのカメラの設定
+        auto PtrCamera = PtrView->GetCamera();
+        PtrCamera->SetEye(Vector3(0.0f, 5.0f, -5.0f));
+        PtrCamera->SetAt(Vector3(0.0f, 0.0f, 0.0f));
+
+        //マルチビューにビューの追加2
+        PtrView = PtrMultiView->AddView();
+        //ビューの矩形を設定（ゲームサイズ右半分）
+        rect = Rect2D&lt;float>(0, 0, (float)640, (float)800);
+        rect += Point2D&lt;float>(640.0f, 0);
+        <span class="red">PtrView->ResetParamaters&lt;Camera, MultiLight>(rect, ViewBkColor, 1, 0.2f, 1.0f);</span>
+        //ビューのビューのライトの設定
+        PtrLight = PtrView->GetMultiLight()->GetLight(0);
+        PtrLight->SetPositionToDirectional(-0.25f, 1.0f, -0.25f);
+        //ビューのカメラの設定
+        PtrCamera = PtrView->GetCamera();
+        PtrCamera->SetEye(Vector3(0.0f, 2.0f, -5.0f));
+        PtrCamera->SetAt(Vector3(0.0f, 0.0f, 0.0f));
+
+        //マルチビューにビューの追加3
+        PtrView = PtrMultiView->AddView();
+        //ビューの矩形を設定（ミニマップ風）
+        rect = Rect2D&lt;float>(0, 0, (float)240, (float)240);
+        rect += Point2D&lt;float>(520.0f, 0);
+        <span class="red">PtrView->ResetParamaters&lt;Camera, MultiLight>(rect, ViewBkColor, 1, 0.0f, 0.2f);</span>
+        //ビューのビューのライトの設定
+        PtrLight = PtrView->GetMultiLight()->GetLight(0);
+        PtrLight->SetPositionToDirectional(-0.25f, 1.0f, -0.25f);
+        //ビューのカメラの設定
+        PtrCamera = PtrView->GetCamera();
+        PtrCamera->SetEye(Vector3(0.0f, 10.0f, 0.0f));
+        PtrCamera->SetAt(Vector3(0.0f, 0.0f, 0.0f));
+        <span class="red">PtrCamera->SetUp(Vector3(0.0f, 0.0f, 1.0f));  //上から見るのでUpを変える</span>
+
+    }
+</pre>
+</div>
+　赤くなってるところが重要なところです。
+<div class="box1">
+<pre>
+        //最初のビューにパラメータの設定
+        <span class="red">PtrView->ResetParamaters&lt;LookAtCamera, MultiLight>(rect, ViewBkColor, 1, 0.2f, 1.0f);</span>
+</pre>
+</div>
+　で、<b>0.2f,1.0f</b>と指定しているのは、使用する奥行（Z方向）です。<br />
+　奥行は0.0fから1.0fまでの間に設定することができ、通常は<b>0.0f,1.0f</b>と設定します。<br />
+　しかし画面分割をする場合、<b>画面同士が並んだり重なったり</b>します。<br />
+　並ぶ場合は、<b>0.0f,1.0f</b>で問題ないのですが、重なった場合は、奥行で使用する範囲を設定しなければなりません。<br />
+　ここでは、左右の画面は<b>0.2f,1.0f</b>とし、重なるミニマップ風画面を<b>0.0f,0.2f</b>としています。こうすることでうまく重なります。<br />
+
+
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_02.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="30_04.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

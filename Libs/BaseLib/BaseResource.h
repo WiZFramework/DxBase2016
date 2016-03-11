@@ -156,6 +156,78 @@ namespace basedx11{
 	struct BackupData : public BackupDataBase {
 		vector<T> m_Vertices;
 	};
+
+	struct VertexPositionNormalTexturePOD{
+		float position[3];
+		float normal[3];
+		float textureCoordinate[2];
+	};
+
+	struct VertexPositionNormalTextureSkinningPOD{
+		float position[3];
+		float normal[3];
+		float textureCoordinate[2];
+		uint32_t indices[4];
+		float weights[4];
+	};
+
+
+	struct MaterialEx{
+		//!開始インデックス
+		UINT m_StartIndex;
+		//!描画インデックスカウント
+		UINT m_IndexCount;
+		//! デフィーズ（物体の色）
+		Color4 m_Diffuse;
+		//! スペキュラー（反射光）
+		Color4 m_Specular;
+		//! アンビエント（環境色）
+		Color4 m_Ambient;
+		//! エミッシブ（放射光）
+		Color4 m_Emissive;
+		//シェーダリソースビュー（テクスチャリソース）
+		shared_ptr<TextureResource> m_TextureResource;
+	};
+
+	struct MaterialExPOD{
+		//!開始インデックス
+		UINT m_StartIndex;
+		//!描画インデックスカウント
+		UINT m_IndexCount;
+		//! デフィーズ（物体の色）
+		float m_Diffuse[4];
+		//! スペキュラー（反射光）
+		float m_Specular[4];
+		//! アンビエント（環境色）
+		float m_Ambient[4];
+		//! エミッシブ（放射光）
+		float m_Emissive[4];
+	};
+
+	struct	MatrixPOD
+	{
+		float	m_Mat[4][4];
+	};
+
+
+
+	enum class BlockType{
+		Vertex,
+		Index,
+		Material,
+		MaterialCount,
+		SkinedVertex,
+		BoneCount,
+		AnimeMatrix,
+		End = 100
+	};
+
+	struct BlockHeader{
+		BlockType m_Type;
+		UINT m_Size;
+	};
+
+
 	//--------------------------------------------------------------------------------------
 	//	class MeshResource : public BaseResource;
 	/*!
@@ -170,6 +242,12 @@ namespace basedx11{
 		UINT m_NumVertices;				//頂点の数
 		UINT m_NumIndicis;				//インデックスの数
 		shared_ptr<BackupDataBase> m_BackUpData;
+		vector<MaterialEx> m_MaterialExVec;	//マテリアルの配列（モデルで使用）
+		//以下、ボーン用
+		bool m_IsSkining;
+		UINT m_BoneCount;	//ボーンの数
+		UINT m_SampleCount;	//サンプリング数
+		vector<Matrix4X4> m_SampleMatrixVec;	//サンプリングされたボーン行列
 	protected:
 		//派生クラスからのみアクセスできるアクセサ
 		//--------------------------------------------------------------------------------------
@@ -292,6 +370,17 @@ namespace basedx11{
 			return m_NumIndicis;
 		}
 		//--------------------------------------------------------------------------------------
+		//	const vvector<MaterialEx>& GetMaterialExVec()const;
+		/*!
+		@breaf マテリアル配列の取得
+		@param なし
+		@return	マテリアルの配列
+		*/
+		//--------------------------------------------------------------------------------------
+		const vector<MaterialEx>& GetMaterialExVec()const{
+			return m_MaterialExVec;
+		}
+		//--------------------------------------------------------------------------------------
 		//	virtual bool IsSkining() const;
 		/*!
 		@breaf スキニングするかどうか.<br />
@@ -300,7 +389,34 @@ namespace basedx11{
 		@return	スキニングする場合はtrue
 		*/
 		//--------------------------------------------------------------------------------------
-		virtual bool IsSkining() const { return false; }
+		virtual bool IsSkining() const { return m_IsSkining; }
+		//--------------------------------------------------------------------------------------
+		//	UINT GetBoneCount() const;
+		/*!
+		@breaf ボーン数を得る
+		@param なし
+		@return	ボーン数
+		*/
+		//--------------------------------------------------------------------------------------
+		UINT GetBoneCount() const{
+			return m_BoneCount;
+		}
+		//--------------------------------------------------------------------------------------
+		//	UINT GetSampleCount() const;
+		/*!
+		@breaf サンプリング数を得る
+		@param なし
+		@return	サンプリング数
+		*/
+		//--------------------------------------------------------------------------------------
+		UINT GetSampleCount() const{
+			return m_SampleCount;
+		}
+
+		const vector<Matrix4X4>& GetSampleMatrixVec() const{
+			return m_SampleMatrixVec;
+		}
+
 		//リソース構築
 		//--------------------------------------------------------------------------------------
 		//	static shared_ptr<Dx11CommonMes> CreateSquare(
@@ -465,6 +581,54 @@ namespace basedx11{
 		static shared_ptr<MeshResource> CreateIcosahedron(float Size, bool AccessWrite = false);
 
 		//--------------------------------------------------------------------------------------
+		// static void ReadBaseData(
+		//		const wstring& BinDataDir, //基準ディレクトリ
+		//		const wstring& BinDataFile,	//データファイル名
+		//		vector<VertexPositionNormalTexture>& vertices,	//頂点の参照 
+		//		vector<uint16_t>& indices,	//インデックスの参照
+		//		vector<MaterialEx>& materials	//マテリアルの参照
+		//	);
+		/*!
+		@breaf オリジナルメッシュデータの読み込み（スタティックメッシュ）
+		@param	const wstring& BinDataDir, 基準ディレクトリ
+		@param	const wstring& BinDataFile,	データファイル名
+		@param	vector<VertexPositionNormalTexture>& vertices,	頂点の参照
+		@param	vector<uint16_t>& indices,	インデックスの参照
+		@param	vector<MaterialEx>& materials	マテリアルの参照
+		@return	なし
+		*/
+		//--------------------------------------------------------------------------------------
+		static void ReadBaseData(const wstring& BinDataDir, const wstring& BinDataFile,
+			vector<VertexPositionNormalTexture>& vertices, vector<uint16_t>& indices, vector<MaterialEx>& materials);
+
+		static void ReadBaseBoneData(const wstring& BinDataDir, const wstring& BinDataFile,
+			vector<VertexPositionNormalTextureSkinning>& vertices, vector<uint16_t>& indices, vector<MaterialEx>& materials,
+			vector<Matrix4X4>& bonematrix, UINT& BoneCount, UINT& SampleCount);
+
+
+		//--------------------------------------------------------------------------------------
+		// static shared_ptr<MeshResource> CreateStaticModelMesh(
+		//		const wstring& BinDataDir,//基準ディレクトリ
+		//		const wstring& BinDataFile,//データファイル名
+		//		bool AccessWrite = false	//頂点を変更できるかどうか
+		//	);
+		/*!
+		@breaf オリジナルメッシュの作成（スタティックメッシュ）
+		@param	const wstring& BinDataDir, 基準ディレクトリ
+		@param	const wstring& BinDataFile,	データファイル名
+		@param	bool AccessWrite = false	頂点を変更できるかどうか
+		@return	リソースのスマートポインタ
+		*/
+		//--------------------------------------------------------------------------------------
+		static shared_ptr<MeshResource> CreateStaticModelMesh(const wstring& BinDataDir, 
+			const wstring& BinDataFile, bool AccessWrite = false);
+
+		static shared_ptr<MeshResource> CreateBoneModelMesh(const wstring& BinDataDir,
+			const wstring& BinDataFile, bool AccessWrite = false);
+
+
+
+		//--------------------------------------------------------------------------------------
 		//
 		//	template<typename T>
 		//	static  shared_ptr<MeshResource> CreateMeshResource(
@@ -620,8 +784,7 @@ namespace basedx11{
 					);
 			}
 			//座標を変更する
-			auto Dev = App::GetApp()->GetDeviceResources<Dx11DeviceResources>();
-			auto pDx11Device = Dev->GetD3DDevice();
+			auto Dev = App::GetApp()->GetDeviceResources();
 			auto pID3D11DeviceContext = Dev->GetD3DDeviceContext();
 			//頂点バッファをリソースから取り出す
 			auto pVertexBuffer = GetVertexBuffer().Get();

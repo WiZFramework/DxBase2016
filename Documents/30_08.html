@@ -1,0 +1,117 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３０８．モデルの表示</h3>
+<br />
+<h4>フレームワークにおけるモデル形式</h4>
+　<b>DxBase2016フレームワーク</b>では、モデルの形式を<b>独自フォーマット</b>であつかいます。<br />
+　この形式は、<b>.bmf</b>という拡張子を持ち、<b>Autodesk社のFBXフォーマト</b>を<b>データ変換ツール(Fbx2Bin)</b>により変換して使用します。<br />
+　<b>Fbx2Binツール</b>についての詳細は、<b>ツール</b>項目を参照ください。<br />
+　さて、フレームワークの前バージョン<b>DxBase2015フレームワーク</b>では、<b>Autodesk社のFBX_SDK</b>をゲームにセットアップし、表現していました。<br />
+　しかし、以下のような問題（というか課題）が出てきました。<br />
+<div class="box1">
+<pre>
+１、FBXフォーマットは多機能でありますが、多機能すぎて、すべての形式に対応するのはまず難しいということ。
+２、リアルタイムでモデルを動かすには、多機能さを前面に出すより、カスタマイズのしやすさや、
+　むしろ、使わない機能を省略した形でのデータが望ましい、ということ。
+３、FBX_SDKがどんどん巨大になっていること。新しいバージョンに常時差し替えるのは、リスクが大きい。
+４、データ変換ツール<b>Fbx2Binツール</b>をカスタマイズすることにより、それぞれのゲーム独自のモデル形式を
+　作成できます。モデルデータの勉強のためにも、このほうが望ましい、と思われます。
+</pre>
+</div>
+　これらの理由により、<b>Autodesk社のFBXフォーマト</b>を<b>独自フォーマットに変換して利用する</b>という方法に切り替えました。<br />
+　<b>Fbx2Binツールと独自フォーマット</b>については、前バージョンでも、<b>シンプルフレームワーク</b>でのモデルの表現に使用していました。ですから扱い的には、<b>前バージョンのシンプルフレームワーク</b>と同じ（ファイル読み取り部分をフレームワーク内に入れたもの）ということになります。<br />
+<br />
+<h4>スタティックなモデルの表示</h4>
+　<b>DxBase2016フレームワーク</b>では、モデルにボーンやアニメーションを含まないモデルを<b>スタティックモデル</b>を表現し、ボーンやアニメーションを含むものを<b>ボーンモデル</b>と表現します。この項は、<b>スタティックモデル</b>の解説です。<br />
+　<b>Sample308ディレクトリ</b>のソリューションを開いて、リビルド、実行してみましょう。すると以下の画面が現れます。
+<p>&nbsp;</p>
+<img src="img/3008a.jpg" width="80%"/>
+<p>図3008a</p>
+<p>&nbsp;</p>
+　もとになっているのは<b>チュートリアル006</b>です。球体のプレイヤーをモデルにしています。<br />
+　このモデルは、前項のSpriteStdioのサンプルと同様、WiZの学生が作成したものです。FBXファイルとして作成したモデルを、<b>Fbx2Binツール</b>によってスタティックメッシュとして保存しています。<br />
+　mediaディレクトリ内の、<b>Chara_R.bmf</b>がモデルファイルです。モデルに使用するテクスチャ（Chara_R.png）を同じディレクトリに保存しておきます。<br />
+<br />
+　<b>スタティックモデル</b>を読み込むには、あらかじめ<b>リソース登録</b>をしておきます。テクスチャと同様です。<br />
+　このサンプルでは、<b>GameStage.cppのGameStage::CreateResourses()</b>内で行っています。
+<div class="box1">
+<pre>
+    void GameStage::CreateResourses(){
+        //中略
+        <span class="red">App::GetApp()->RegisterStaticModelMesh(
+            L"Chara_R_MESH", App::GetApp()->m_wstrRelativeDataPath, L"Chara_R.bmf");</span>
+    }
+</pre>
+</div>
+　ここでは、基準ディレクトリが<b>App::GetApp()->m_wstrRelativeDataPath</b>で、ファイル名が<b>L"Chara_R.bmf"</b>のモデルを読み込み、<b>L"Chara_R_MESH"</b>という<b>キー名</b>で登録します。こうしておくと、各オブジェクトで使用できるようになります。<br />
+　プレイヤーでの記述は以下のような感じです。<b>Player.cpp</b>の<b>Player::OnCreate()</b>に記述します。
+<div class="box1">
+<pre>
+    void Player::OnCreate(){
+
+        //中略
+
+        Matrix4X4 SpanMat; // モデルとトランスフォームの間の差分行列
+        SpanMat.DefTransformation(
+            Vector3(1.0f, 1.0f, 1.0f),
+            Vector3(0.0f, XM_PI, 0.0f),
+            Vector3(0.0f, -0.5f, 0.0f)
+            );
+
+
+        //影をつける（シャドウマップを描画する）
+        auto ShadowPtr = AddComponent&lt;Shadowmap>();
+        //影の形（メッシュ）を設定
+        <span class="red">ShadowPtr->SetMeshResource(L"Chara_R_MESH");
+        ShadowPtr->SetMeshToTransformMatrix(SpanMat);
+
+        //描画コンポーネントの設定
+        auto PtrDraw = AddComponent&lt;PNTStaticModelDraw>();
+        //描画するメッシュを設定
+        PtrDraw->SetMeshResource(L"Chara_R_MESH");
+        PtrDraw->SetMeshToTransformMatrix(SpanMat);</span>
+
+        //透明処理
+        SetAlphaActive(true);
+
+        //中略
+    }
+</pre>
+</div>
+　ここで設定されている<b>SpanMat</b>というのは、モデルのローカル座標と、衝突判定などのゲームで操作される座標
+の差分を埋める行列です。このモデルは、原点が、足の下にあり、そのため、少しY座標を下げています。また、向きがプレイヤーと逆なのでY軸で回転させています。このように、グラフィッカーが作成したモデルをゲーム盤に合わせるのに使用します。<br />
+　この行列は、シャドウマップ及び、描画コンポーネントに設定します。<br />
+　スタティックモデルの描画コンポーネントは、<b>PNTStaticModelDraw</b>です。AddComponentで設定します。<br />
+　このコンポーネントはテクスチャの設定は必要ありません。テクスチャはメッシュデータの中に含まれているので、メッシュの作成時に内部で設定されます。ただ、テクスチャファイルをモデルと同じディレクトリを基準に探すので、テクスチャの保存位置は注意が必要です。同じディレクトリ内においておけば安全です。<br />
+　以上で設定は終わりです。アニメーションはしませんが、チュートリアル006のように、Aボタンでジャンプし、固定ボックスに乗ることも可能です。<br />
+　また、モデルのデータ形式や読み込むときの動作などは、<b>Fbx2Binツール</b>の解説を参照ください。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_07.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="30_09.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

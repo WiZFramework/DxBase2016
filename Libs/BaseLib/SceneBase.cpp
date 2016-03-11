@@ -1683,9 +1683,13 @@ namespace basedx11{
 
 	//ステージ内の描画（シーンからよばれる）
 	void Stage::DrawStage(){
+		//レイヤーの取得と設定
+		set<int> DrawLayers;
 		//Spriteかそうでないかを分離
 		for (auto ptr : GetGameObjectVec()){
 			if (ptr->IsDrawActive()){
+				//描画レイヤーに登録
+				DrawLayers.insert(ptr->GetDrawLayer());
 				//Spriteかその派生クラスなら分離
 				if (ptr->GetDynamicComponent<SpriteBaseDraw>(false) || ptr->IsSpriteDraw()){
 					pImpl->m_SpriteVec.push_back(ptr);
@@ -1695,12 +1699,9 @@ namespace basedx11{
 				}
 			}
 		}
-		//レイヤーの取得と設定
-		set<int> DrawLayers;
 		//3Dの透明と非透明を分離
 		for (auto ptr : pImpl->m_Object3DVec){
 			if (ptr->IsDrawActive()){
-				DrawLayers.insert(ptr->GetDrawLayer());
 				if (ptr->IsAlphaActive()){
 					pImpl->m_Object3DAlphaVec.push_back(ptr);
 				}

@@ -90,6 +90,37 @@ void VertexUtil::CreateCylinderCap(vector<VertexPositionNormalTexture>& vertices
         vertices.push_back(VertexPositionNormalTexture(position, normal, textureCoordinate));
     }
 }
+/**************************************************************************
+static  void  VertexUtil::CreateSquare(
+float size,	//1つの辺のサイズ
+vector<VertexPositionNormalTexture>& vertices, //頂点を作成するための配列
+vector<uint16_t>& indices	//インデックスを作成するための配列
+);
+用途: 平面を作成する(static関数)
+戻り値: なし
+＊VertexPosNormalTexフォーマットの平面を作成する
+***************************************************************************/
+void  VertexUtil::CreateSquare(float size,
+	vector<VertexPositionNormalTexture>& vertices, vector<uint16_t>& indices) {
+	try {
+		float HelfSize = size / 2.0f;
+		//頂点配列
+		vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(-HelfSize, HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f)));
+		vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(HelfSize, HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(1.0f, 0.0f)));
+		vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(-HelfSize, -HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(0.0f, 1.0f)));
+		vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(HelfSize, -HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(1.0f, 1.0f)));
+		//インデックスを作成するための配列
+		indices.push_back((uint16_t)0);
+		indices.push_back((uint16_t)1);
+		indices.push_back((uint16_t)2);
+		indices.push_back((uint16_t)1);
+		indices.push_back((uint16_t)3);
+		indices.push_back((uint16_t)2);
+	}
+	catch (...) {
+		throw;
+	}
+}
 
 
 /**************************************************************************

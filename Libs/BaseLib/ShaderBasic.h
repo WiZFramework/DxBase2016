@@ -6,7 +6,6 @@ namespace basedx11{
 
 
 	//Shadow
-
 	struct ShadowConstantBuffer
 	{
 		XMMATRIX mWorld;
@@ -17,43 +16,9 @@ namespace basedx11{
 			memset(this, 0, sizeof(ShadowConstantBuffer));
 		};
 	};
-	//--------------------------------------------------------------------------------------
-	//	class CBShadow : public ConstantBuffer<CBShadow,ShadowConstantBuffer>;
-	//	用途: コンスタントバッファ
-	//--------------------------------------------------------------------------------------
-	class CBShadow : public ConstantBuffer<CBShadow, ShadowConstantBuffer>{
-	public:
-	};
-
-	//--------------------------------------------------------------------------------------
-	//	class VSShadowmap : public VertexShader<VSShadowmap, VertexPositionNormalTexture>;
-	//	用途: VSShadowmap頂点シェーダ
-	//--------------------------------------------------------------------------------------
-	class VSShadowmap : public VertexShader<VSShadowmap, VertexPositionNormalTexture>{
-	public:
-		//構築
-		VSShadowmap();
-	};
-
-	//--------------------------------------------------------------------------------------
-	//	class VSShadowmapBone : public VertexShader<VSShadowmapBone, VertexPositionNormalTextureSkinning>;
-	//	用途: VSShadowmapBone頂点シェーダ
-	//--------------------------------------------------------------------------------------
-	class VSShadowmapBone : public VertexShader<VSShadowmapBone, VertexPositionNormalTextureSkinning>{
-	public:
-		//構築
-		VSShadowmapBone();
-	};
-
-	//--------------------------------------------------------------------------------------
-	//	class PSShadowmap : public PixelShader<PSShadowmap>;
-	//	用途: PSShadowmapピクセルシェーダ
-	//--------------------------------------------------------------------------------------
-	class PSShadowmap : public PixelShader<PSShadowmap>{
-	public:
-		//構築
-		PSShadowmap();
-	};
+	DECLARE_DX11_CONSTANT_BUFFER(CBShadow, ShadowConstantBuffer)
+	DECLARE_DX11_VERTEX_SHADER(VSShadowmap, VertexPositionNormalTexture)
+	DECLARE_DX11_VERTEX_SHADER(VSShadowmapBone, VertexPositionNormalTextureSkinning)
 
 	//PDirect
 	DECLARE_DX11_VERTEX_SHADER(VSPDirect, VertexPosition)
@@ -210,7 +175,44 @@ namespace basedx11{
 	DECLARE_DX11_PIXEL_SHADER(PSPNTStaticShadow2)
 
 
+	//PNTBone
+	struct PNTBoneConstantBuffer
+	{
+		Matrix4X4 World;
+		Matrix4X4 View;
+		Matrix4X4 Projection;
+		Vector4 LightDir;
+		Color4 Emissive;
+		Color4 Diffuse;
+		XMVECTOR Bones[3 * 72];
+		PNTBoneConstantBuffer() {
+			memset(this, 0, sizeof(PNTBoneConstantBuffer));
+		};
+	};
 
+	DECLARE_DX11_CONSTANT_BUFFER(CBPNTBone, PNTBoneConstantBuffer)
+	DECLARE_DX11_VERTEX_SHADER(VSPNTBone, VertexPositionNormalTextureSkinning)
+
+	struct PNTBoneShadowConstantBuffer
+	{
+		Matrix4X4 World;
+		Matrix4X4 View;
+		Matrix4X4 Projection;
+		Vector4 LightDir;
+		Color4 Emissive;
+		Color4 Diffuse;
+		Vector4 LightPos;
+		Vector4 EyePos;
+		XMUINT4 ActiveFlg;			//テクスチャ=xがアクティブかどうか
+		Matrix4X4 LightView;
+		Matrix4X4 LightProjection;
+		XMVECTOR Bones[3 * 72];
+		PNTBoneShadowConstantBuffer() {
+			memset(this, 0, sizeof(PNTBoneShadowConstantBuffer));
+		};
+	};
+	DECLARE_DX11_CONSTANT_BUFFER(CBPNTBoneShadow, PNTBoneShadowConstantBuffer)
+	DECLARE_DX11_VERTEX_SHADER(VSPNTBoneShadow, VertexPositionNormalTextureSkinning)
 
 
 

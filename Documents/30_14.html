@@ -1,0 +1,435 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３１４．XML読み込みと書き込み</h3>
+<br />
+<h4>XMLとは何か</h4>
+　<b>XML形式</b>とは、インターネットで広く使用されているテキスト文書の仕様であり、<b>DOM（ドキュメントオブジェクトモデル）</b>によって読み書きされます。<br />
+　<b>HTML形式</b>とも似ていますが、<b>HTML形式</b>が、主に<b>デザインやコントロールや画像などのオブジェクト</b>を記述する形式の仕様であるのに対して、<b>XML形式</b>は<b>データそのもの</b>を記述します。<br />
+　<b>HTML形式</b>と<b>XML形式</b>の違いを述べることで、<b>XML形式</b>の説明を始めます。<br />
+　まず、<b>HTML形式</b>です。以下は内容の抜粋ですが
+<div class="box1">
+<pre>
+&lt;p>
+テスト文書&lt;br />
+&lt;input type="text" name="name" value="" />&lt;br />
+&lt;a href="hogehoge.html">ほげ&lt;/a>&lt;br />
+&lt;img src="hoge.png" />
+&lt;/p>
+</pre>
+</div>
+　ここでは、<b>pタグ</b>という<b>ブロック</b>で囲まれて、中に、<b>テスト文書</b>というテキストがあります。ほかに、改行をあらわす<b>brタグ</b>、入力フィールドをあらわす<b>inputタグ</b>、リンクをあらわす<b>aタグ</b>、そして画像をあらわす<b>imgタグ</b>があります。<br />
+　これらのタグ（<b>&lt;と>で囲まれたブロック</b>）は、上記の例を見ると明らかのように、<b>用途がはっきり</b>しています。つまり、ブラウザはこれらのタグの指定に合わせて、リンクを作成したり、入力フィールドを作成したりします。<br />
+　意味のないタグやブラウザが理解できないタグを記述すると、ブラウザは無視します。<br />
+<br />
+　それに対して、<b>XML形式</b>の例は以下のようになります。<b>HTML形式</b>形式同様、抜粋ですが
+<div class="box1">
+<pre>
+&lt;data>
+    &lt;item id="1">テスト1&lt;/item>
+    &lt;item id="2">テスト2&lt;/item>
+    &lt;item id="3">テスト3&lt;/item>
+    &lt;item id="4">テスト4&lt;/item>
+&lt;/data>
+</pre>
+</div>
+　<b>タグ</b>や<b>アトリビュート（id="1"のような記述）</b>、そして<b>タグ内のテキスト</b>で構成されていれば、<b>タグ名は何でもよい（ただし日本語はおすすめしない）</b>のが<b>XML形式</b>です。<br />
+　そして必ず<b>矛盾のないツリー構造</b>になってないといけません。（開始タグには、それに対応する終了タグが必要）<br />
+　そういう意味では、<b>HTMLはXMLの一部</b>と考えられますが、実はそうでもありません。なぜなら<b>HTMLは場合によっては終了タグがなくてもよい</b>記述ができます。<br />
+　例外的な記述として
+<div class="box1">
+<pre>
+&lt;data>
+    &lt;item id="1" />
+&lt;/data>
+</pre>
+</div>
+　という記述が認められています（HTMLのinputタグのような記述）。内部テキストを持たないタグに対して、このような記述が可能です。これは以下と同じ意味になります。
+<div class="box1">
+<pre>
+&lt;data>
+    &lt;item id="1">&lt;/item>
+&lt;/data>
+</pre>
+</div>
+<br />
+<h4>XMLヘッダ</h4>
+　上記のXML説明で<b>抜粋ですが</b>と断ったのは、ここに<b>XMLヘッダ</b>というのが入って、完全な<b>XML形式</b>となります。以下はヘッダも含めた記述です。
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="utf-8" ?>
+&lt;data>
+    &lt;item id="1">テスト1&lt;/item>
+    &lt;item id="2">テスト2&lt;/item>
+    &lt;item id="3">テスト3&lt;/item>
+    &lt;item id="4">テスト4&lt;/item>
+&lt;/data>
+</pre>
+</div>
+　これで、<b>DxBase2015から読み込める</b>ようになります。<b>encoding="utf-8"</b>とあるように、通常XMLファイルは、<b>UTF-8</b>で記述します。Shift-JISで記述する場合は、
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="Shift-JIS" ?>
+&lt;data>
+    &lt;item id="1">テスト1&lt;/item>
+    &lt;item id="2">テスト2&lt;/item>
+    &lt;item id="3">テスト3&lt;/item>
+    &lt;item id="4">テスト4&lt;/item>
+&lt;/data>
+</pre>
+</div>
+　のように記述します。どちらのエンコードで記述しても、読みこんだあとは<b>wstring</b>で扱えるようになります。<br />
+　前項で説明した<b>csv形式</b>の場合、必ず<b>Shift-JIS（もしくはCP932）</b>で記述するように説明しましたが、XMLの場合、<b>ヘッダにきちんと指定があれば</b>、エンコードは問いません。<br />
+　このほかに、ヘッダには
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+</pre>
+</div>
+　のように、<b>スタンドアローンかどうか</b>を加えることもありますが、これは、<b>外部参照</b>をしてるかしてないかの宣言です。<b>standalone="yes"</b>となっていて外部参照していると読み込みエラーになります。<br />
+　外部参照は、仕様的には使えないこともないですが、この説明の範疇を超えますので、省略します。<br/>
+<br/>
+<h4>XMLの読み込み</h4>
+　<b>Sample314ディレクトリ</b>のソリューションを開き、リビルド、実行をすると、前項（CSV読み書きサンプル）と同じ画面がでてきます。動きそのものは、前項のサンプルと変わりありません。<br />
+　<b>前項やSample314</b>の動きは、具体的には以下のようになります。<br />
+<div class="box1">
+<pre>
+１、起動時にシークオブジェクトの初期値を読み込む
+２、起動時にプレイヤーのデータがあれば、初期値を読み込む
+３、終了時にプレイヤーの位置を保存
+</pre>
+</div>
+　まず、<b>１、起動時にシークオブジェクトの初期値を読み込む</b>から説明します。<br />
+<br />
+　シークオブジェクトの読み込みは<b>GameStgae.cppのGameStage::CreateSeekObject()関数</b>に記述があります。<br />
+<div class="box1">
+<pre>
+    void GameStage::CreateSeekObject(){
+        //オブジェクトのグループを作成する
+        auto Group = CreateSharedObjectGroup(L"ObjectGroup");
+
+        wstring MediaPath = App::GetApp()->m_wstrRelativeDataPath;
+        //XMLファイルの決定
+        wstring XMLFilename = MediaPath + L"GameStage.xml";
+        //ローカル上にXMLファイル読み取りクラスを作成
+        XmlDocReader GameStageXml(XMLFilename);
+        //メンバ関数でゲームオブジェクトのノードを取得
+        auto ObjectsRoot = GameStageXml.GetSelectSingleNode(L"GameStage/GameObjects");
+        if (!ObjectsRoot){
+            throw BaseException(
+                L"GameStage/GameObjectsが見つかりません",
+                L"if (!ObjectsRoot)",
+                L"GameStage::CreateSeekObject()"
+                );
+        }
+        //static関数呼び出しで、SeekObjectノードの配列を得る
+        auto SeekObjects = XmlDocReader::GetSelectNodes(ObjectsRoot,L"SeekObject");
+        //static関数呼び出しで、SeekObjectノードの数を得る
+        long lCountNode = XmlDocReader::GetLength(SeekObjects);
+        for (long i = 0; i &lt; lCountNode; i++){
+            //static関数呼び出しで、個別のノードを得る
+            auto PositionNode = XmlDocReader::GetItem(SeekObjects, i);
+            //static関数呼び出しで、位置ノードを得る
+            auto StartPosNode = XmlDocReader::GetSelectSingleNode(PositionNode, L"StartPosition");
+            //static関数呼び出しで、ノード内の文字列を得る
+            wstring StartPosStr = XmlDocReader::GetText(StartPosNode);
+            if (StartPosStr == L""){
+                throw BaseException(
+                    L"スタート位置が空白です",
+                    L"if (StartPosStr == L\"\")",
+                    L"GameStage::CreateSeekObject()"
+                    );
+            }
+            vector&lt; wstring > StrVec;
+            Util::WStrToTokenVector(StrVec, StartPosStr, L',');
+            //分解した配列からデータを取り出す
+            AddGameObject&lt;SeekObject>(Vector3(StrVec[0], StrVec[1], StrVec[2]));
+        }
+
+    }
+</pre>
+</div>
+　ここではまず、<b>XMLファイル</b>を決定し
+<div class="box1">
+<pre>
+        //ローカル上にXMLファイル読み取りクラスを作成
+        XmlDocReader GameStageXml(XMLFilename);
+</pre>
+</div>
+　という形で<b>XmlDocReaderクラスのインスタンス</b>を作成します。読み込むだけなら、XmlDocReaderクラスで充分です。保存するためには、このあとプレイヤーのところで説明する、<b>XmlDocクラス</b>を使用します。<br />
+　<b>XmlDocReaderクラス</b>はコンストラクタに<b>XMLファイル名</b>を渡します。その<b>XMLファイル(GameStage.xml)</b>は以下のようになっています。
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="utf-8" ?>
+&lt;GameStage>
+    &lt;GameObjects>
+        &lt;SeekObject>
+            &lt;StartPosition>0,0.125f,10.0f&lt;/StartPosition>
+        &lt;/SeekObject>
+        &lt;SeekObject>
+            &lt;StartPosition>10.0f,0.125f,0.0f&lt;/StartPosition>
+        &lt;/SeekObject>
+        &lt;SeekObject>
+            &lt;StartPosition>-10.0f,0.125f,0.0f&lt;/StartPosition>
+        &lt;/SeekObject>
+        &lt;SeekObject>
+            &lt;StartPosition>0,0.125f,-10.0f&lt;/StartPosition>
+        &lt;/SeekObject>
+    &lt;/GameObjects>
+&lt;/GameStage>
+</pre>
+</div>
+　<b>DxBase2015</b>では、XMLの読み込み書き出しのインターフェイスに<b>MSXML</b>という<b>DOM（ドキュメントオブジェクトモデル）</b>を使用しています。ゲーム制作の環境では、<b>TinyXML</b>を使用するケースもありますが、データ内容（タグ構成など）を決め打ちするのにはいいのですが、汎用的に使用するには、やはり<b>MSXML</b>の方が便利です。<br />
+　このXMLファイルには<b>GameStage、GameObjects、SeekObject</b>の3つのタグが階層化されて含まれます。XMLを理解するのは、この<b>階層化</b>の仕組みを理解する必要があります。<br />
+　<b>GameStageには、1つのGameObjects</b>があります。<b>GameObjectsには複数のSeekObject</b>があります。<br />
+　これらを、MSXMLでは<b>ノード</b>という単位で扱います。つまり、タグやアトリビュートを、ツリー構造の<b>節</b>のように見立てます。<br />
+　そして、それらの<b>ノード</b>を抽出するために<b>XPath（エックスパス）</b>という<b>クエリ言語</b>を使います。<b>XPath（エックスパス）</b>自体は、複雑なクエリを記述できますが、ここでは単純に<b>ノードの選択</b>に使います。<br />
+<div class="box1">
+<pre>
+        //メンバ関数でゲームオブジェクトのノードを取得
+        auto ObjectsRoot = GameStageXml.GetSelectSingleNode(L"GameStage/GameObjects");
+</pre>
+</div>
+　この記述は、<b>L"GameStage/GameObjects"</b>という<b>クエリ（XPath）</b>を使って、<b>GameStageの中のGameObjectsのノード</b>を取得します。ですから、関数が成功すれば、ObjectsRootには、<b>GameObjectsのノード（単一ノード）</b>が代入されます。<br />
+　続いて、
+<div class="box1">
+<pre>
+        //static関数呼び出しで、SeekObjectノードの配列を得る
+        auto SeekObjects = XmlDocReader::GetSelectNodes(ObjectsRoot,L"SeekObject");
+</pre>
+</div>
+　のように。<b>XmlDocReaderのスタティック関数</b>を使って、<b>ObjectsRoot直下のL"SeekObject"のノード</b>を取得します。<b>SeekObject</b>は複数あるので、<b>GetSelectNodes()関数</b>を使います。つまり、ツリーが複数に枝分かれしているイメージです。<br />
+　このようにして取得した複数ノード<b>SeekObjects</b>は、以下の方法で一つ一つにアクセスできます。
+<div class="box1">
+<pre>
+        //static関数呼び出しで、SeekObjectノードの数を得る
+        long lCountNode = XmlDocReader::GetLength(SeekObjects);
+        for (long i = 0; i &lt; lCountNode; i++){
+            //static関数呼び出しで、個別のノードを得る
+            auto PositionNode = XmlDocReader::GetItem(SeekObjects, i);
+</pre>
+</div>
+　このようにして個別の<b>SeekObject</b>のノードを取得したら、
+<div class="box1">
+<pre>
+            //static関数呼び出しで、位置ノードを得る
+            auto StartPosNode = XmlDocReader::GetSelectSingleNode(PositionNode, L"StartPosition");
+            //static関数呼び出しで、ノード内の文字列を得る
+            wstring StartPosStr = XmlDocReader::GetText(StartPosNode);
+</pre>
+</div>
+　のように<b>StartPositionのノード</b>を取り出し、その中のテキスト文字列を<b>XmlDocReader::GetText()関数</b>で取得します。この関数の戻り値はwstring型なので、前項同様、そのまま<b>AddGameObjectでシークオブジェクトを追加</b>することができます。<br />
+　つまり、流れ的には
+<div class="box1">
+<pre>
+１、XPathを使って目的のノードを取り出す。
+２、取り出したノードから、必要な情報（テキスト）を取り出す。
+</pre>
+</div>
+　といった操作になります。<br />
+<br/>
+　ちなみに、このサンプルでは、<b>XmlDocReaderクラスの説明</b>も兼ねているので、階層化されたノードをルートから順番に取得していますが、XMLをよく見ると、<b>複数のStartPositionノード</b>を一度に取得出来れば用が足ります。<br />
+　ということは、<b>GameStage::CreateSeekObject()関数</b>は以下のようにも書けます。差し替えて確認してみましょう。
+<div class="box1">
+<pre>
+    void GameStage::CreateSeekObject(){
+        //オブジェクトのグループを作成する
+        auto Group = CreateSharedObjectGroup(L"ObjectGroup");
+
+        wstring MediaPath = App::GetApp()->m_wstrRelativeDataPath;
+        //XMLファイルの決定
+        wstring XMLFilename = MediaPath + L"GameStage.xml";
+        //ローカル上にXMLファイル読み取りクラスを作成
+        XmlDocReader GameStageXml(XMLFilename);
+        //メンバ関数でシークオブジェクトの位置ノードを取得
+        auto StartPosList 
+            = GameStageXml.GetSelectNodes(L"GameStage/GameObjects/SeekObject/StartPosition");
+        if (!StartPosList){
+            throw BaseException(
+                L"位置情報が見つかりません",
+                L"if (!StartPosList)",
+                L"GameStage::CreateSeekObject()"
+                );
+        }
+        long lCountNode = XmlDocReader::GetLength(StartPosList);
+        for (long i = 0; i &lt; lCountNode; i++){
+            //static関数呼び出しで、個別のノードを得る
+            auto StartPosNode = XmlDocReader::GetItem(StartPosList, i);
+            //static関数呼び出しで、ノード内の文字列を得る
+            wstring StartPosStr = XmlDocReader::GetText(StartPosNode);
+            if (StartPosStr == L""){
+                throw BaseException(
+                    L"スタート位置が空白です",
+                    L"if (StartPosStr == L\"\")",
+                    L"GameStage::CreateSeekObject()"
+                    );
+            }
+            vector&lt; wstring > StrVec;
+            Util::WStrToTokenVector(StrVec, StartPosStr, L',');
+            //分解した配列からデータを取り出す
+            AddGameObject&lt;SeekObject>(Vector3(StrVec[0], StrVec[1], StrVec[2]));
+        }
+
+    }
+</pre>
+</div>
+　この記述でも、データは取得できます。この<b>XPathの特徴</b>は
+<div class="box1">
+<pre>
+        //メンバ関数でシークオブジェクトの位置ノードを取得
+        auto StartPosList 
+            = GameStageXml.GetSelectNodes(L"GameStage/GameObjects/SeekObject/StartPosition");
+</pre>
+</div>
+　といきなり、<b>SeekObjectを飛び越えてStartPositionまで</b>手を伸ばしているところです。<br />
+<br />
+<h4>プレイヤーのXMLの読み込み</h4>
+　それでは、前項のように、プレイヤーのデータを読みむ方法を説明します。<br />
+　こちらは、あとで保存することを考え、<b>XmlDocReaderクラスではなくXmlDocクラス</b>を利用します。<br />
+　また、前項はプレイヤー用のcsvは最初は用意しませんでしたが、XMLの場合、最初から構築するのはちょっと大変なので、データの入ってない状態のxmlファイルを用意しておきます。<br />
+　<b>GameData.xml</b>という名前でxmlファイルを以下の内容で作成し、あらかじめ<b>mediaディレクトリ</b>に保存しておきます。
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;GameData>
+&lt;/GameData>
+</pre>
+</div>
+　このように初期状態として作成しますが、ゲーム終了時のプレイヤーの位置情報が保存されると以下のようになります。
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;GameData>
+&lt;Player Position="10.0,0.125,15.0" />
+&lt;/GameData>
+</pre>
+</div>
+　ここでは、XYZの各値は、もう少し細かい数字になりますが、ようは<b>Position="10.0,0.125,15.0"</b>のような<b>アトリビュート</b>を使用します。<br />
+<br />
+　xmlファイルを初期状態で保存した後、<b>Player.h</b>の宣言部に、以下の記述をします。
+<div class="box1">
+<pre>
+    class Player : public GameObject{
+        //中略
+        //プレイヤーの保存用xml
+        wstring m_DataFileName;
+        XmlDoc m_XmlDoc;    //XMLドキュメント
+    public:
+        //構築と破棄
+        Player(const shared_ptr&lt;Stage>& StagePtr,const wstring& XmlFileName);
+        //中略
+    };
+</pre>
+</div>
+　ここでは、<b>XmlDocクラスのメンバ変数と、xmlファイル名を保持しておく文字列</b>を実装します。<br />　コンストラクタの引数も修正します。<br />
+　そうして、コンストラクタは以下のように記述します。<b>Player.cpp</b>です。
+<div class="box1">
+<pre>
+    Player::Player(const shared_ptr&lt;Stage>& StagePtr, const wstring& XmlFileName) :
+        GameObject(StagePtr),
+        <span class="red">m_DataFileName(XmlFileName),
+        m_XmlDoc(XmlFileName),</span>
+        m_MaxSpeed(40.0f),  //最高速度
+        m_Decel(0.95f), //減速値
+        m_Mass(1.0f)    //質量
+    {}
+</pre>
+</div>
+　実際の読み込みは<b>OnCreate()関数</b>で行います。
+<div class="box1">
+<pre>
+    void Player::OnCreate(){
+        //初期位置などの設定
+        auto Ptr = AddComponent&lt;Transform>();
+        Ptr->SetScale(0.25f, 0.25f, 0.25f); //直径25センチの球体
+        Ptr->SetRotation(0.0f, 0.0f, 0.0f);
+        <span class="red">//プレイヤーのアトリビュートノードをxpathで選択
+        auto PlayerAtt = m_XmlDoc.GetSelectSingleNode(L"GameData/Player/@Position");</span>
+        if (!PlayerAtt){
+            //値がない
+            //初期位置
+            Ptr->SetPosition(0, 0.125f, 0);
+        }
+        else{
+            vector&lt;wstring> PosTokenVec;
+            wstring PlayerPosStr = m_XmlDoc.GetText(PlayerAtt);
+            Util::WStrToTokenVector(PosTokenVec, PlayerPosStr, L',');
+            //初期位置
+            Ptr->SetPosition(Vector3(PosTokenVec[0], PosTokenVec[1], PosTokenVec[2]));
+        }
+
+        //中略
+
+    }
+</pre>
+</div>
+　ここで注目してほしいのは、<b>XPathでアトリビュートのノード</b>を取得しようとしているところです。XPathで、アトリビュートノードを取得する場合は、<b>L"GameData/Player/@Position"</b>のように<b>@</b>をつけてクエリを記述します。この場合<b>&lt;Player Position="なにがし" /></b>と記述した<b>Positionアトリビュート</b>のノードを取得できます。<br />
+<br />
+<h4>プレイヤーのXMLの保存</h4>
+　プレイヤーの位置情報の保存は、前項どおり、プレイヤーのデストラクタで行います。以下、デストラクタです。
+<div class="box1">
+<pre>
+    Player::~Player(){
+        //ルートノードをxpathで選択
+        auto RootNode = m_XmlDoc.GetSelectSingleNode(L"GameData");
+        if (RootNode){
+            auto PlayerNode = m_XmlDoc.GetSelectSingleNode(RootNode, L"Player");
+            if (!PlayerNode){
+                <span class="red">//プレイヤーのNodeがない
+                PlayerNode = m_XmlDoc.AddChildNode(RootNode, L"Player");</span>
+            }
+            auto Ptr = GetComponent&lt;Transform>();
+            wstring PlayerPosStr(L"");
+            auto Pos = Ptr->GetPosition();
+            PlayerPosStr += Util::FloatToWStr(Pos.x, 6, Util::FloatModify::Fixed) + L",";
+            PlayerPosStr += Util::FloatToWStr(Pos.y, 6, Util::FloatModify::Fixed) + L",";
+            PlayerPosStr += Util::FloatToWStr(Pos.z, 6, Util::FloatModify::Fixed);
+            <span class="red">//PositionというアトリビュートにPlayerPosStrを設定
+            m_XmlDoc.SetAttribute(PlayerNode, L"Position", PlayerPosStr.c_str());</span>
+            //保存
+            <span class="red">m_XmlDoc.Save(m_DataFileName,false);</span>
+        }
+
+    }
+</pre>
+</div>
+　ここでは、もし<b>Playerタグ</b>が存在しなければ、作成しています。そのうえで、<b>Positionというアトリビュート</b>に値を設定します。<br />
+　最後に<b>m_XmlDoc.Save()</b>で保存します。<b>Save()関数</b>の最初の引数はXMLファイル名です。ここを読み取りファイル名と違うファイル名にすることもできます。2番目の引数は<b>失敗したら例外を投げるかどうか</b>です。デストラクタから例外は投げない方がよいので、<b>false</b>にしておきます。<br />
+<br />
+　こうして保存すると、以下のようなxmlファイルになります。
+<div class="box1">
+<pre>
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;GameData>
+    &lt;Player Position="14.691892,0.643750,9.515530"/>&lt;/GameData>
+</pre>
+</div>
+　改行やインデント等が少しおかしくなりますが、特別支障はありません。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_13.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

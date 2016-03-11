@@ -1356,12 +1356,9 @@ namespace basedx11{
 
 		//スプライトかどうか
 		bool m_SpriteType;
-		//スプライトの1メートル当たりのピクセル
-		float m_SpritePixelParMeter;
 
 		//ライティングしないかどうか（デフォルトtrue）
 		bool m_TextureOnlyNoLight;
-
 
 		//頂点変更時のデータ
 		Vertex2DAnimeData m_Vertex2DAnimeData;
@@ -1388,7 +1385,6 @@ namespace basedx11{
 		m_Prio(0),
 		m_Alpha(1.0f),
 		m_SpriteType(SpriteType),
-		m_SpritePixelParMeter(8.0f),
 		m_TextureOnlyNoLight(true)
 	{
 		try{
@@ -1502,7 +1498,24 @@ namespace basedx11{
 			wstring ResName = pImpl->m_SsaeName + L"_" + pImpl->name;
 			//リソース作成。別のインスタンスでも同じリソースを使う
 			if (!App::GetApp()->CheckResource<MeshResource>(ResName)){
-				pImpl->m_SquareRes = MeshResource::CreateSquare(1.0f, true);
+				//頂点配列
+				vector<VertexPositionNormalTexture> vertices;
+				//インデックスを作成するための配列
+				vector<uint16_t> indices;
+				//Squareの作成(ヘルパー関数を利用)
+				VertexUtil::CreateSquare(1.0f, vertices, indices);
+				//頂点の型を変えた新しい頂点を作成
+				vector<VertexPositionColorTexture> new_vertices;
+				for (auto& v : vertices){
+					VertexPositionColorTexture nv;
+					nv.position = v.position;
+					nv.color = Color4(1.0f, 1.0f, 1.0f, 1.0f);
+					nv.textureCoordinate = v.textureCoordinate;
+					new_vertices.push_back(nv);
+				}
+				//新しい頂点を使ってメッシュリソースの作成
+				pImpl->m_SquareRes = MeshResource::CreateMeshResource<VertexPositionColorTexture>(new_vertices, indices, true);
+				//リソースの登録
 				App::GetApp()->RegisterResource(ResName, pImpl->m_SquareRes);
 			}
 			else{
@@ -1520,15 +1533,13 @@ namespace basedx11{
 				}
 			}
 			//スクエア用
-			auto PtrDraw = AddComponent<PNTStaticDraw>();
+			auto PtrDraw = AddComponent<PCTStaticDraw>();
 			//スプライト用
-			auto PtrSprite = AddComponent<PCTSpriteDraw>(Vector2(32.0f,32.0f),Color4(1.0f, 1.0f, 1.0f, 1.0f));
-	//		PtrSprite->SetPixelParMeter(pImpl->m_SpritePixelParMeter);
+			auto PtrSprite = AddComponent<PCTSpriteDraw>(Vector2(32.0f, 32.0f), Color4(1.0f, 1.0f, 1.0f, 1.0f));
 			//中心原点
-	//		PtrSprite->SetCoordinate(Sprite::Coordinate::m_CenterZeroPlusUpY);
+			PtrSprite->SetSpriteCoordinate(SpriteCoordinate::m_CenterZeroPlusUpY);
 			//透明処理をする
 			SetAlphaActive(true);
-			SetAlphaExActive(true);
 		}
 		catch (...){
 			throw;
@@ -1554,17 +1565,6 @@ namespace basedx11{
 	}
 	bool SSPart::IsSpriteType() const{
 		return pImpl->m_SpriteType;
-	}
-	//スプライトにおける、1メートル当たりのピクセル（デフォルト8）
-	float SSPart::GetSpritePixelParMeter() const{
-		return pImpl->m_SpritePixelParMeter;
-	}
-	void SSPart::SetSpritePixelParMeter(float f){
-		pImpl->m_SpritePixelParMeter = f;
-		//子供も設定
-		for (auto ptr : pImpl->m_Childlen){
-			ptr->SetSpritePixelParMeter(f);
-		}
 	}
 
 	void SSPart::SetTextureOnlyNoLight(bool b){
@@ -1607,8 +1607,7 @@ namespace basedx11{
 		//頂点バッファをリソースから取り出す
 		auto pVertexBuffer = pImpl->m_SquareRes->GetVertexBuffer().Get();
 		//バックアップの頂点を取り出す
-		vector<VertexPositionNormalTexture>& BacukVertices = pImpl->m_SquareRes->GetBackupVerteces<VertexPositionNormalTexture>();
-
+		vector<VertexPositionColorTexture>& BacukVertices = pImpl->m_SquareRes->GetBackupVerteces<VertexPositionColorTexture>();
 		//D3D11_MAP_WRITE_DISCARDは重要。この処理により、GPUに邪魔されない
 		D3D11_MAP mapType = D3D11_MAP_WRITE_DISCARD;
 		D3D11_MAPPED_SUBRESOURCE mappedBuffer;
@@ -1622,7 +1621,7 @@ namespace basedx11{
 				);
 		}
 		//UV値の変更
-		VertexPositionNormalTexture* vertices = (VertexPositionNormalTexture*)mappedBuffer.pData;
+		VertexPositionColorTexture* vertices = (VertexPositionColorTexture*)mappedBuffer.pData;
 		Rect2D<float> UVRectBase(0, 0, pImpl->m_SS5CellPtr->get_size().x, pImpl->m_SS5CellPtr->get_size().y);
 		UVRectBase += pImpl->m_SS5CellPtr->get_pos();
 
@@ -1651,29 +1650,36 @@ namespace basedx11{
 
 		CellRect -= Pivot;
 
-		vertices[0] = VertexPositionNormalTexture(
+		vertices[0] = VertexPositionColorTexture(
 			XMFLOAT3(
 			CellRect.left + pImpl->m_Vertex2DAnimeData.LeftTop.x / grid,
 			CellRect.top + pImpl->m_Vertex2DAnimeData.LeftTop.y / grid,
 			0),
-			XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(UVRect.left, UVRect.top));
+			Color4(1.0f, 1.0f, 1.0f, pImpl->m_Alpha),
+			XMFLOAT2(UVRect.left, UVRect.top));
 
-		vertices[1] = VertexPositionNormalTexture(
+		vertices[1] = VertexPositionColorTexture(
 			XMFLOAT3(
 			CellRect.right + pImpl->m_Vertex2DAnimeData.RightTop.x / grid,
 			CellRect.top + pImpl->m_Vertex2DAnimeData.RightTop.y / grid,
-			0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(UVRect.right, UVRect.top));
+			0), 
+			Color4(1.0f, 1.0f, 1.0f, pImpl->m_Alpha),
+			XMFLOAT2(UVRect.right, UVRect.top));
 
-		vertices[2] = VertexPositionNormalTexture(
+		vertices[2] = VertexPositionColorTexture(
 			XMFLOAT3(
 			CellRect.left + pImpl->m_Vertex2DAnimeData.LeftBottom.x / grid,
 			CellRect.bottom + +pImpl->m_Vertex2DAnimeData.LeftBottom.y / grid,
-			0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(UVRect.left, UVRect.bottom));
-		vertices[3] = VertexPositionNormalTexture(
+			0), 
+			Color4(1.0f, 1.0f, 1.0f, pImpl->m_Alpha),
+			XMFLOAT2(UVRect.left, UVRect.bottom));
+		vertices[3] = VertexPositionColorTexture(
 			XMFLOAT3(
 			CellRect.right + pImpl->m_Vertex2DAnimeData.RightBottom.x / grid,
 			CellRect.bottom + pImpl->m_Vertex2DAnimeData.RightBottom.y / grid,
-			0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(UVRect.right, UVRect.bottom));
+			0), 
+			Color4(1.0f, 1.0f, 1.0f, pImpl->m_Alpha),
+			XMFLOAT2(UVRect.right, UVRect.bottom));
 		//アンマップ
 		pID3D11DeviceContext->Unmap(pVertexBuffer, 0);
 	}
@@ -1735,14 +1741,9 @@ namespace basedx11{
 			);
 
 		auto PtrSprite = GetComponent<PCTSpriteDraw>();
-//		PtrSprite->UpdateVirtexBuffer(m_VertexVec);
-//		PtrSprite->SetPixelParMeter(pImpl->m_SpritePixelParMeter);
-
-
-
+		auto Mesh = PtrSprite->GetMeshResource();
+		Mesh->UpdateVirtexBuffer(m_VertexVec);
 	}
-
-
 
 	//アニメーション後の行列を計算する
 	void SSPart::CaluclateMatrix(){
@@ -1780,11 +1781,9 @@ namespace basedx11{
 					PtrSprite->OnDraw();
 				}
 				else{
-					auto PtrDraw = GetComponent<PNTStaticDraw>();
+					auto PtrDraw = GetComponent<PCTStaticDraw>();
 					PtrDraw->SetMeshResource(pImpl->m_SquareRes);
-					PtrDraw->SetDiffuse(Color4(1.0f, 1.0f, 1.0f, pImpl->m_Alpha));
 					PtrDraw->SetTextureResource(pImpl->m_TextureResource);
-//					PtrDraw->SetTextureOnlyNoLight(pImpl->m_TextureOnlyNoLight);
 					PtrDraw->OnDraw();
 				}
 			}
@@ -2030,13 +2029,9 @@ namespace basedx11{
 		SetAlphaActive(true);
 		SetAlphaExActive(true);
 		if (IsSpriteType()){
-			//スプライトの場合、最後に描画するため、コンポーネント設定のみ行う
-			auto PtrSprite = AddComponent<PCTSpriteDraw>(Vector2(32.0f,32.0f),Color4(1.0f, 1.0f, 1.0f, 1.0f));
 			//スプライトとして描画する
 			SetSpriteDraw(true);
 		}
-
-
 	}
 
 
@@ -2098,14 +2093,6 @@ namespace basedx11{
 		return pImpl->m_SpriteType;
 	}
 
-	//スプライトにおける、1メートル当たりのピクセル（デフォルト8）
-	float SS5ssae::GetSpritePixelParMeter() const{
-		return pImpl->m_RootPart->GetSpritePixelParMeter();
-	}
-	void SS5ssae::SetSpritePixelParMeter(float f){
-		pImpl->m_RootPart->SetSpritePixelParMeter(f);
-	}
-
 	void SS5ssae::SetTextureOnlyNoLight(bool b){
 		pImpl->m_TextureOnlyNoLight = b;
 	}
@@ -2117,9 +2104,6 @@ namespace basedx11{
 		return pImpl->m_TextureOnlyNoLight;
 	}
 
-
-
-
 	bool ZSortModelFunc(SSPart* rLeft, SSPart* rRight){
 		if (rLeft->GetPrio() == rRight->GetPrio()){
 			return rLeft->get_arrayIndex() < rRight->get_arrayIndex();
@@ -2128,7 +2112,6 @@ namespace basedx11{
 	}
 
 	void SS5ssae::OnDraw(){
-		//コンポーネント描画
 		ComponentDraw();
 		vector<SSPart*> PartVec;
 		pImpl->m_RootPart->SetPartInVector(PartVec);

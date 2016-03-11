@@ -797,6 +797,19 @@ static void CreatePrimitiveBuffer(
         }
     }
 /**************************************************************************
+static  void CreateSquare(
+	float size,	//1つの辺のサイズ
+	vector<VertexPositionNormalTexture>& vertices, //頂点を作成するための配列
+	vector<uint16_t>& indices	//インデックスを作成するための配列
+);
+	用途: 平面を作成する(static関数)
+	戻り値: なし
+	＊VertexPosNormalTexフォーマットの平面を作成する
+***************************************************************************/
+	static void CreateSquare(float size,
+		vector<VertexPositionNormalTexture>& vertices, vector<uint16_t>& indices);
+
+/**************************************************************************
  static  void CreateCube(
 	float size,	//1つの辺のサイズ
 	vector<VertexPositionNormalTexture>& vertices, //頂点を作成するための配列

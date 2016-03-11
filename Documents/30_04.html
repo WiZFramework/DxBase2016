@@ -1,0 +1,97 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>３．演出補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>３０４．画面分割２</h3>
+<br />
+<h4>1ステージ複数カメラでは対応できない時</h4>
+　前項では、<b>１つのステージを複数カメラで見る</b>例を紹介しました。<br />
+　しかし、画面分割しつつ、いくつかのスプライトは1式のみ、のような分割は前項のやり方ではうまくいきません。<br />
+　<b>Sample304</b>では、そんな画面分割方法の紹介です。<br />
+　<b>Sample304</b>を開き、リビルド、実行すると以下の画面が現れます。
+<p>&nbsp;</p>
+<img src="img/3004a.jpg" width="80%"/>
+<p>図3004a</p>
+<p>&nbsp;</p>
+　左右の分割された画面は前項どおりです。問題は、左下のスプライトです。これは、ゲーム全体で1つずつしかありません。<br />
+　こんな画面を作るためには、<b>子ステージ</b>を使います。すなわち、スプライトを表示している部分は、子ステージとして、左右分割のステージと切り離します。以下は、<b>子ステージ</b>である<b>ChildGameStageクラス</b>の<b>CreateViews()関数</b>です。
+<div class="box1">
+<pre>
+    void ChildGameStage::CreateViews(){
+        //最初にデフォルトのレンダリングターゲット類を作成する
+        //パラメータの2048.0fはシャドウマップのサイズ。大きいほど影が細かくなる（4096.0fなど）
+        //影を細かくするとメモリを大量に消費するので注意！
+        CreateDefaultRenderTargets(2048.0f);
+        //マルチビューコンポーネントの取得
+        auto PtrMultiView = GetComponent&lt;MultiView>();
+        //マルチビューにビューの追加
+        auto PtrView = PtrMultiView->AddView();
+        //ビューの矩形を設定（ゲームサイズ全体）
+        Rect2D&lt;float> rect(0, 0, (float)App::GetApp()->GetGameWidth(), 
+            (float)App::GetApp()->GetGameHeight());
+        //ビューの背景色(透明)
+        Color4 ViewBkColor(0.0f, 0.0f, 0.0f, 0.0f);
+        //最初のビューにパラメータの設定
+        PtrView->ResetParamaters&lt;Camera, MultiLight>(rect, ViewBkColor, 1, 0.0f, 0.2f);
+        //最初のビューのビューのライトの設定
+        auto PtrLight = PtrView->GetMultiLight()->GetLight(0);
+        PtrLight->SetPositionToDirectional(-0.25f, 1.0f, -0.25f);
+        //ビューのカメラの設定
+        //配置オブジェクトがスプライトのみの場合は設定しなくてもよいが
+        //設定してもスプライトには影響しないので、設定しておく
+        auto PtrCamera = PtrView->GetCamera();
+        PtrCamera->SetEye(Vector3(0.0f, 0.0f, -10.0f));
+        PtrCamera->SetAt(Vector3(0.0f, 0.0f, 0.0f));
+    }
+</pre>
+</div>
+　このように、Z奥行を<b>0.0f, 0.2f</b>にしたビューを作成します。こうして、スプライトを実装します。内容は<b>Sample301</b>と同じものです。<br/>
+　そうしておいて、親ステージの<b>OnCreate()関数</b>の最後に、以下の1文を追加します。
+<div class="box1">
+<pre>
+    void GameStage::OnCreate(){
+        try{
+
+            //中略
+
+            <span class="red">//子供ステージの作成
+            AddChileStage&lt;ChildGameStage>();</span>
+
+        }
+        catch (...){
+            throw;
+        }
+    }
+</pre>
+</div>
+　これで上記の画面になります。<br />
+　
+
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="30_03.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="30_05.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

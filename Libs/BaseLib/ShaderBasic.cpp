@@ -3,45 +3,10 @@
 
 namespace basedx11{
 
-	//--------------------------------------------------------------------------------------
-	//	class CBShadow : public ConstantBuffer<CBShadow>;
-	//	用途: コンスタントバッファ
-	//--------------------------------------------------------------------------------------
-	//シングルトン処理
-	unique_ptr<CBShadow, CBShadow::Deleter> CBShadow::m_Ptr;
-
-	//--------------------------------------------------------------------------------------
-	//	class VSShadowmap : public VertexShader<VSShadowmap, VertexPositionNormalTexture>;
-	//	用途: VSShadowmap頂点シェーダ
-	//--------------------------------------------------------------------------------------
-	//シングルトン処理
-	unique_ptr<VSShadowmap, VSShadowmap::Deleter> VSShadowmap::m_Ptr;
-	//構築
-	VSShadowmap::VSShadowmap():
-		VertexShader(App::GetApp()->m_wstrRelativeShadersPath + L"VSShadowmap.cso")
-	{}
-
-	//--------------------------------------------------------------------------------------
-	//	class VSShadowmapBone : public VertexShader<VSShadowmapBone, VertexPositionNormalTextureSkinning>;
-	//	用途: VSShadowmapBone頂点シェーダ
-	//--------------------------------------------------------------------------------------
-	//シングルトン処理
-	unique_ptr<VSShadowmapBone, VSShadowmapBone::Deleter> VSShadowmapBone::m_Ptr;
-	//構築
-	VSShadowmapBone::VSShadowmapBone() :
-		VertexShader(App::GetApp()->m_wstrRelativeShadersPath + L"VSShadowmapBone.cso")
-	{}
-
-	//--------------------------------------------------------------------------------------
-	//	class PSShadowmap : public PixelShader<PSShadowmap>;
-	//	用途: PSShadowmapピクセルシェーダ
-	//--------------------------------------------------------------------------------------
-	unique_ptr<PSShadowmap, PSShadowmap::Deleter> PSShadowmap::m_Ptr;
-	//構築
-	PSShadowmap::PSShadowmap() :
-		PixelShader(App::GetApp()->m_wstrRelativeShadersPath + L"PSShadowmap.cso")
-	{}
-
+	//Shadowmap
+	IMPLEMENT_DX11_CONSTANT_BUFFER(CBShadow)
+	IMPLEMENT_DX11_VERTEX_SHADER(VSShadowmap, App::GetApp()->m_wstrRelativeShadersPath + L"VSShadowmap.cso")
+	IMPLEMENT_DX11_VERTEX_SHADER(VSShadowmapBone, App::GetApp()->m_wstrRelativeShadersPath + L"VSShadowmapBone.cso")
 
 	//PDirect
 	IMPLEMENT_DX11_VERTEX_SHADER(VSPDirect, App::GetApp()->m_wstrRelativeShadersPath + L"VSPDirect.cso")
@@ -109,6 +74,13 @@ namespace basedx11{
 	IMPLEMENT_DX11_VERTEX_SHADER(VSPNTStaticShadow, App::GetApp()->m_wstrRelativeShadersPath + L"VSPNTStaticShadow.cso")
 	IMPLEMENT_DX11_PIXEL_SHADER(PSPNTStaticShadow, App::GetApp()->m_wstrRelativeShadersPath + L"PSPNTStaticShadow.cso")
 	IMPLEMENT_DX11_PIXEL_SHADER(PSPNTStaticShadow2, App::GetApp()->m_wstrRelativeShadersPath + L"PSPNTStaticShadow2.cso")
+
+	//PNTBone
+	IMPLEMENT_DX11_CONSTANT_BUFFER(CBPNTBone)
+	IMPLEMENT_DX11_VERTEX_SHADER(VSPNTBone, App::GetApp()->m_wstrRelativeShadersPath + L"VSPNTBone.cso")
+
+	IMPLEMENT_DX11_CONSTANT_BUFFER(CBPNTBoneShadow)
+	IMPLEMENT_DX11_VERTEX_SHADER(VSPNTBoneShadow, App::GetApp()->m_wstrRelativeShadersPath + L"VSPNTBoneShadow.cso")
 
 
 }

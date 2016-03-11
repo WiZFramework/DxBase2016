@@ -575,6 +575,41 @@ namespace basedx11{
 		shared_ptr<TextureResource> RegisterTexture(const wstring& Key, const wstring& TextureFileName, const wstring& TexType = L"WIC");
 
 		//--------------------------------------------------------------------------------------
+		//	shared_ptr<MeshResource> RegisterStaticModelMesh(
+		//		const wstring& Key, // リソースキー
+		//		const wstring& BinDataDir,	//基準ディレクトリ 
+		//		const wstring& BinDataFile	//スタティックモデルメッシュファイル
+		//	);
+		/*!
+		@breaf スタティックモデルの登録(同じキーのテクスチャがなければファイル名で作成し、登録)。
+		同じ名前のメッシュがあればそのポインタを返す
+		@param const wstring& Key リソースキー
+		@param const wstring& BinDataDir	基準ディレクトリ
+		@param const wstring& BinDataFile	スタティックモデルメッシュファイル
+		@return	リソースのスマートポインタ
+		*/
+		//--------------------------------------------------------------------------------------
+		shared_ptr<MeshResource> RegisterStaticModelMesh(const wstring& Key,const wstring& BinDataDir,const wstring& BinDataFile);
+
+		//--------------------------------------------------------------------------------------
+		//	shared_ptr<MeshResource> RegisterBoneModelMesh(
+		//		const wstring& Key, // リソースキー
+		//		const wstring& BinDataDir,	//基準ディレクトリ 
+		//		const wstring& BinDataFile	//スタティックモデルメッシュファイル
+		//	);
+		/*!
+		@breaf ボーンモデルの登録(同じキーのテクスチャがなければファイル名で作成し、登録)。
+		同じ名前のメッシュがあればそのポインタを返す
+		@param const wstring& Key リソースキー
+		@param const wstring& BinDataDir	基準ディレクトリ
+		@param const wstring& BinDataFile	スタティックモデルメッシュファイル
+		@return	リソースのスマートポインタ
+		*/
+		//--------------------------------------------------------------------------------------
+		shared_ptr<MeshResource> RegisterBoneModelMesh(const wstring& Key, const wstring& BinDataDir, const wstring& BinDataFile);
+
+
+		//--------------------------------------------------------------------------------------
 		//	shared_ptr<AudioResource> RegisterWav(
 		//		const wstring& Key, // リソースキー
 		//		const wstring& WavFileName	//Wavファイル名
@@ -586,7 +621,8 @@ namespace basedx11{
 		@param const wstring& WavFileName テクスチャファイル名
 		@return	リソースのスマートポインタ
 		*/
-		shared_ptr<AudioResource> RegisterWav(const wstring& Key,const wstring& WavFileName);
+		//--------------------------------------------------------------------------------------
+		shared_ptr<AudioResource> RegisterWav(const wstring& Key, const wstring& WavFileName);
 		//--------------------------------------------------------------------------------------
 		//	template <typename T>
 		//	bool CheckResource(

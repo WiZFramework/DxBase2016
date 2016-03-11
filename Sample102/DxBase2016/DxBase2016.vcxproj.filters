@@ -313,5 +313,11 @@
     <FxCompile Include="..\..\Libs\BaseLib\Shaders\VSShadowmapBone.hlsl">
       <Filter>BaseLib\Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Libs\BaseLib\Shaders\VSPNTBone.hlsl">
+      <Filter>BaseLib\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Libs\BaseLib\Shaders\VSPNTBoneShadow.hlsl">
+      <Filter>BaseLib\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

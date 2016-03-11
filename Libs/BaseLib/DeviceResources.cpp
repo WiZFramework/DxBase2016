@@ -358,6 +358,7 @@ namespace basedx11{
 		pImpl->m_PipelineResourceVec.push_back(res);
 	}
 
+#ifdef test
 
 	void DrawContext::DrawVertex(const shared_ptr<GameObject>& GameObjectPtr, 
 		const shared_ptr<MeshResource>& Mesh, UINT stride, UINT offset,
@@ -603,6 +604,7 @@ namespace basedx11{
 		pImpl->m_PipelineResourceVec.clear();
 		Dev->InitializeStates(RenderStatePtr);
 	}
+#endif
 
 	void DrawContext::DrawIndexedBase(const shared_ptr<GameObject>& GameObjectPtr,
 		ID3D11Buffer* pConstantBuffer, const void* CBData,
@@ -680,56 +682,60 @@ namespace basedx11{
 			pID3D11DeviceContext->OMSetDepthStencilState(RenderStatePtr->GetDepthRead(), 0);
 			break;
 		}
-		//ブレンドステートとラスタライザを設定して描画
-		//もし、透明描画ならAlphaBlendExに設定し、そうでなければ、指定に従う。
-		if (GameObjectPtr->GetAlphaActive()) {
-			pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetAlphaBlendEx(), nullptr, 0xffffffff);
-			//ラスタライザステート
-			pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullFront());
-			//描画
-			pID3D11DeviceContext->DrawIndexed(Mesh->GetNumIndicis(), 0, 0);
-			//ラスタライザステート
-			pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullBack());
+		if (GetPipeLineDesc().m_RasterizerState == RasterizerState::Wireframe){
+			pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetOpaque(), nullptr, 0xffffffff);
+			pID3D11DeviceContext->RSSetState(RenderStatePtr->GetWireframe());
 			//描画
 			pID3D11DeviceContext->DrawIndexed(Mesh->GetNumIndicis(), 0, 0);
 		}
-		else {
-			switch (GetPipeLineDesc().m_BlendState) {
-			case BlendState::Opaque:
-				pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetOpaque(), nullptr, 0xffffffff);
-				break;
-			case BlendState::AlphaBlend:
+		else{
+			//ブレンドステートとラスタライザを設定して描画
+			//もし、透明描画ならAlphaBlendExに設定し、そうでなければ、指定に従う。
+			if (GameObjectPtr->GetAlphaActive()) {
 				pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetAlphaBlendEx(), nullptr, 0xffffffff);
-				break;
-			case BlendState::Additive:
-				pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetAdditive(), nullptr, 0xffffffff);
-				break;
-			case BlendState::NonPremultiplied:
-				pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetNonPremultiplied(), nullptr, 0xffffffff);
-				break;
-			}
-			switch (GetPipeLineDesc().m_RasterizerState) {
-			case RasterizerState::CullBack:
-				pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullBack());
-				break;
-			case RasterizerState::CullFront:
+				//ラスタライザステート
 				pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullFront());
-				break;
-			case RasterizerState::CullNone:
-				pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullNone());
-				break;
-			case RasterizerState::Wireframe:
-				pID3D11DeviceContext->RSSetState(RenderStatePtr->GetWireframe());
-				break;
+				//描画
+				pID3D11DeviceContext->DrawIndexed(Mesh->GetNumIndicis(), 0, 0);
+				//ラスタライザステート
+				pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullBack());
+				//描画
+				pID3D11DeviceContext->DrawIndexed(Mesh->GetNumIndicis(), 0, 0);
 			}
-			//描画
-			pID3D11DeviceContext->DrawIndexed(Mesh->GetNumIndicis(), 0, 0);
+			else {
+				switch (GetPipeLineDesc().m_BlendState) {
+				case BlendState::Opaque:
+					pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetOpaque(), nullptr, 0xffffffff);
+					break;
+				case BlendState::AlphaBlend:
+					pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetAlphaBlendEx(), nullptr, 0xffffffff);
+					break;
+				case BlendState::Additive:
+					pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetAdditive(), nullptr, 0xffffffff);
+					break;
+				case BlendState::NonPremultiplied:
+					pID3D11DeviceContext->OMSetBlendState(RenderStatePtr->GetNonPremultiplied(), nullptr, 0xffffffff);
+					break;
+				}
+				switch (GetPipeLineDesc().m_RasterizerState) {
+				case RasterizerState::CullBack:
+					pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullBack());
+					break;
+				case RasterizerState::CullFront:
+					pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullFront());
+					break;
+				case RasterizerState::CullNone:
+					pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullNone());
+					break;
+				}
+				//描画
+				pID3D11DeviceContext->DrawIndexed(Mesh->GetNumIndicis(), 0, 0);
+			}
 		}
 		//後始末
 		pImpl->m_PipelineResourceVec.clear();
 		Dev->InitializeStates(RenderStatePtr);
 	}
-
 
 
 	void DrawContext::SetVertexShader(ID3D11VertexShader* pVShader, bool SetConstantBuffer) {

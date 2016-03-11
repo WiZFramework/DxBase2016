@@ -194,27 +194,21 @@ namespace basedx11{
 		void SetPixelShader(bool SetConstantBuffer) {
 			SetPixelShader(PS::GetPtr()->GetShader(), SetConstantBuffer);
 		}
-		void SetDefault2DPipeline() {
-			PipeLineDesc Desc;
-			Desc.m_BlendState = BlendState::Opaque;
-			Desc.m_DepthStencilState = DepthStencilState::None;
-			Desc.m_RasterizerState = RasterizerState::CullBack;
-			SetPipeLineDesc(Desc);
-		}
-		void SetDefault3DPipeline() {
-			PipeLineDesc Desc;
-			Desc.m_BlendState = BlendState::Opaque;
-			Desc.m_DepthStencilState = DepthStencilState::Default;
-			Desc.m_RasterizerState = RasterizerState::CullBack;
-			SetPipeLineDesc(Desc);
-		}
+		//void SetDefault2DPipeline() {
+		//	PipeLineDesc Desc;
+		//	Desc.m_BlendState = BlendState::Opaque;
+		//	Desc.m_DepthStencilState = DepthStencilState::None;
+		//	Desc.m_RasterizerState = RasterizerState::CullBack;
+		//	SetPipeLineDesc(Desc);
+		//}
+		//void SetDefault3DPipeline() {
+		//	PipeLineDesc Desc;
+		//	Desc.m_BlendState = BlendState::Opaque;
+		//	Desc.m_DepthStencilState = DepthStencilState::Default;
+		//	Desc.m_RasterizerState = RasterizerState::CullBack;
+		//	SetPipeLineDesc(Desc);
+		//}
 		void AddSamplerAndSrv(UINT PilelineNum, SamplerState state, ID3D11ShaderResourceView* Srv);
-		void DrawVertex(const shared_ptr<GameObject>& GameObjectPtr,
-			const shared_ptr<MeshResource>& Mesh, UINT stride, UINT offset,
-			const shared_ptr<TextureResource>& Tex, bool Alpha);
-		void DrawIndexed(const shared_ptr<GameObject>& GameObjectPtr,
-			const shared_ptr<MeshResource>& Mesh, UINT stride, UINT offset,
-			const shared_ptr<TextureResource>& Tex, bool Alpha);
 
 		template<typename CBType>
 		void DrawIndexed(const shared_ptr<GameObject>& GameObjectPtr,
@@ -223,7 +217,6 @@ namespace basedx11{
 				CBType::GetPtr()->GetBuffer(), CBData,
 				Mesh, stride, offset);
 		}
-
 
 
 	private:

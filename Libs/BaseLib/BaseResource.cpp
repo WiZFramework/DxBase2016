@@ -357,7 +357,10 @@ namespace basedx11{
 	//--------------------------------------------------------------------------------------
 	//構築
 	MeshResource::MeshResource() :
-		BaseResource()
+		BaseResource(),
+		m_IsSkining(false),
+		m_BoneCount(0),
+		m_SampleCount(0)
 	{}
 	//破棄
 	MeshResource::~MeshResource() {}
@@ -366,22 +369,12 @@ namespace basedx11{
 
 	shared_ptr<MeshResource> MeshResource::CreateSquare(float Size, bool AccessWrite) {
 		try {
-			float HelfSize = Size / 2.0f;
 			//頂点配列
 			vector<VertexPositionNormalTexture> vertices;
-			vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(-HelfSize, HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f)));
-			vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(HelfSize, HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(1.0f, 0.0f)));
-			vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(-HelfSize, -HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(0.0f, 1.0f)));
-			vertices.push_back(VertexPositionNormalTexture(XMFLOAT3(HelfSize, -HelfSize, 0), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(1.0f, 1.0f)));
 			//インデックスを作成するための配列
-			vector<uint16_t> indices{
-				(uint16_t)0,
-				(uint16_t)1,
-				(uint16_t)2,
-				(uint16_t)1,
-				(uint16_t)3,
-				(uint16_t)2,
-			};
+			vector<uint16_t> indices;
+			//Squareの作成(ヘルパー関数を利用)
+			VertexUtil::CreateSquare(Size, vertices, indices);
 			return MeshResource::CreateMeshResource<VertexPositionNormalTexture>(vertices, indices, AccessWrite);
 		}
 		catch (...) {
@@ -544,6 +537,357 @@ namespace basedx11{
 			throw;
 		}
 	}
+
+	void MeshResource::ReadBaseData(const wstring& BinDataDir,const wstring& BinDataFile,
+		vector<VertexPositionNormalTexture>& vertices, vector<uint16_t>& indices, vector<MaterialEx>& materials){
+		vertices.clear();
+		indices.clear();
+		materials.clear();
+		wstring DataFile = BinDataDir + BinDataFile;
+		BinaryReader Reader(DataFile);
+		//ヘッダの読み込み
+		auto pHeader = Reader.ReadArray<char>(16);
+		string str = pHeader;
+		if (str != "BDV1.0"){
+			throw BaseException(
+				L"データ形式が違います",
+				DataFile,
+				L"MeshResource::ReadBaseData()"
+				);
+		}
+		//頂点の読み込み
+		auto blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::Vertex){
+			throw BaseException(
+				L"頂点のヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseData()"
+				);
+		}
+		auto VerTexSize = blockHeader.m_Size / sizeof(VertexPositionNormalTexturePOD);
+		auto pVertex = Reader.ReadArray<VertexPositionNormalTexturePOD>((size_t)VerTexSize);
+		for (UINT i = 0; i < VerTexSize; i++){
+			VertexPositionNormalTexture v;
+			v.position.x = pVertex[i].position[0];
+			v.position.y = pVertex[i].position[1];
+			v.position.z = pVertex[i].position[2];
+			v.normal.x = pVertex[i].normal[0];
+			v.normal.y = pVertex[i].normal[1];
+			v.normal.z = pVertex[i].normal[2];
+			v.textureCoordinate.x = pVertex[i].textureCoordinate[0];
+			v.textureCoordinate.y = pVertex[i].textureCoordinate[1];
+			vertices.push_back(v);
+		}
+
+		//インデックスの読み込み
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::Index){
+			throw BaseException(
+				L"インデックスのヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseData()"
+				);
+		}
+
+		auto IndexSize = blockHeader.m_Size / sizeof(uint16_t);
+		auto pIndex = Reader.ReadArray<uint16_t>((size_t)IndexSize);
+		for (UINT i = 0; i < IndexSize; i++){
+			indices.push_back(pIndex[i]);
+		}
+
+		//マテリアルの読み込み
+		//マテリアル数の読み込み
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::MaterialCount){
+			throw BaseException(
+				L"マテリアル数のヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseData()"
+				);
+		}
+		UINT MaterialCount = blockHeader.m_Size;
+		for (UINT i = 0; i < MaterialCount; i++){
+			//テクスチャファイル名が可変長なので注意。
+			blockHeader = Reader.Read<BlockHeader>();
+			if (blockHeader.m_Type != BlockType::Material){
+				throw BaseException(
+					L"マテリアルのヘッダが違います",
+					DataFile,
+					L"MeshResource::ReadBaseData()"
+					);
+			}
+			UINT TextureFileNameSize = blockHeader.m_Size - sizeof(MaterialExPOD);
+			auto rMaterial = Reader.Read<MaterialExPOD>();
+			MaterialEx ToM;
+			//!開始インデックス
+			ToM.m_StartIndex = rMaterial.m_StartIndex;
+			//!描画インデックスカウント
+			ToM.m_IndexCount = rMaterial.m_IndexCount;
+			//! デフィーズ（物体の色）
+			ToM.m_Diffuse.x = rMaterial.m_Diffuse[0];
+			ToM.m_Diffuse.y = rMaterial.m_Diffuse[1];
+			ToM.m_Diffuse.z = rMaterial.m_Diffuse[2];
+			ToM.m_Diffuse.w = rMaterial.m_Diffuse[3];
+			//! スペキュラー（反射光）
+			ToM.m_Specular.x = rMaterial.m_Specular[0];
+			ToM.m_Specular.y = rMaterial.m_Specular[1];
+			ToM.m_Specular.z = rMaterial.m_Specular[2];
+			ToM.m_Specular.w = rMaterial.m_Specular[3];
+			//! アンビエント（環境色）
+			ToM.m_Ambient.x = rMaterial.m_Ambient[0];
+			ToM.m_Ambient.y = rMaterial.m_Ambient[1];
+			ToM.m_Ambient.z = rMaterial.m_Ambient[2];
+			ToM.m_Ambient.w = rMaterial.m_Ambient[3];
+			//! エミッシブ（放射光）
+			ToM.m_Emissive.x = rMaterial.m_Emissive[0];
+			ToM.m_Emissive.y = rMaterial.m_Emissive[1];
+			ToM.m_Emissive.z = rMaterial.m_Emissive[2];
+			ToM.m_Emissive.w = rMaterial.m_Emissive[3];
+			auto pTexture = Reader.ReadArray<wchar_t>(TextureFileNameSize / sizeof(wchar_t));
+			wstring TextureFileStr = pTexture;
+			TextureFileStr = BinDataDir + TextureFileStr;
+			ToM.m_TextureResource = ObjectFactory::Create<TextureResource>(TextureFileStr);
+			materials.push_back(ToM);
+		}
+
+		//Endの読み込み
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::End){
+			throw BaseException(
+				L"Endヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseData()"
+				);
+		}
+	}
+
+	void MeshResource::ReadBaseBoneData(const wstring& BinDataDir, const wstring& BinDataFile,
+		vector<VertexPositionNormalTextureSkinning>& vertices, vector<uint16_t>& indices, vector<MaterialEx>& materials,
+		vector<Matrix4X4>& bonematrix, UINT& BoneCount, UINT& SampleCount){
+		vertices.clear();
+		indices.clear();
+		materials.clear();
+		bonematrix.clear();
+
+		wstring DataFile = BinDataDir + BinDataFile;
+		BinaryReader Reader(DataFile);
+		//ヘッダの読み込み
+		auto pHeader = Reader.ReadArray<char>(16);
+		string str = pHeader;
+		if (str != "BDV1.0"){
+			throw BaseException(
+				L"データ形式が違います",
+				DataFile,
+				L"MeshResource::ReadBaseBoneData()"
+				);
+		}
+		//頂点の読み込み
+		auto blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::SkinedVertex){
+			throw BaseException(
+				L"頂点(スキン処理)のヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseBoneData()"
+				);
+		}
+		auto VerTexSize = blockHeader.m_Size / sizeof(VertexPositionNormalTextureSkinningPOD);
+		auto pVertex = Reader.ReadArray<VertexPositionNormalTextureSkinningPOD>((size_t)VerTexSize);
+		for (UINT i = 0; i < VerTexSize; i++){
+			VertexPositionNormalTextureSkinning v;
+			v.position.x = pVertex[i].position[0];
+			v.position.y = pVertex[i].position[1];
+			v.position.z = pVertex[i].position[2];
+			v.normal.x = pVertex[i].normal[0];
+			v.normal.y = pVertex[i].normal[1];
+			v.normal.z = pVertex[i].normal[2];
+			v.textureCoordinate.x = pVertex[i].textureCoordinate[0];
+			v.textureCoordinate.y = pVertex[i].textureCoordinate[1];
+			for (int j = 0; j < 4; j++){
+				v.indices[j] = pVertex[i].indices[j];
+				v.weights[j] = pVertex[i].weights[j];
+			}
+			vertices.push_back(v);
+		}
+
+		//インデックスの読み込み
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::Index){
+			throw BaseException(
+				L"インデックスのヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseBoneData()"
+				);
+		}
+
+		auto IndexSize = blockHeader.m_Size / sizeof(uint16_t);
+		auto pIndex = Reader.ReadArray<uint16_t>((size_t)IndexSize);
+		for (UINT i = 0; i < IndexSize; i++){
+			indices.push_back(pIndex[i]);
+		}
+
+		//マテリアルの読み込み
+		//マテリアル数の読み込み
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::MaterialCount){
+			throw BaseException(
+				L"マテリアル数のヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseData()"
+				);
+		}
+		UINT MaterialCount = blockHeader.m_Size;
+		for (UINT i = 0; i < MaterialCount; i++){
+			//テクスチャファイル名が可変長なので注意。
+			blockHeader = Reader.Read<BlockHeader>();
+			if (blockHeader.m_Type != BlockType::Material){
+				throw BaseException(
+					L"マテリアルのヘッダが違います",
+					DataFile,
+					L"MeshResource::ReadBaseBoneData()"
+					);
+			}
+			UINT TextureFileNameSize = blockHeader.m_Size - sizeof(MaterialExPOD);
+			auto rMaterial = Reader.Read<MaterialExPOD>();
+			MaterialEx ToM;
+			//!開始インデックス
+			ToM.m_StartIndex = rMaterial.m_StartIndex;
+			//!描画インデックスカウント
+			ToM.m_IndexCount = rMaterial.m_IndexCount;
+			//! デフィーズ（物体の色）
+			ToM.m_Diffuse.x = rMaterial.m_Diffuse[0];
+			ToM.m_Diffuse.y = rMaterial.m_Diffuse[1];
+			ToM.m_Diffuse.z = rMaterial.m_Diffuse[2];
+			ToM.m_Diffuse.w = rMaterial.m_Diffuse[3];
+			//! スペキュラー（反射光）
+			ToM.m_Specular.x = rMaterial.m_Specular[0];
+			ToM.m_Specular.y = rMaterial.m_Specular[1];
+			ToM.m_Specular.z = rMaterial.m_Specular[2];
+			ToM.m_Specular.w = rMaterial.m_Specular[3];
+			//! アンビエント（環境色）
+			ToM.m_Ambient.x = rMaterial.m_Ambient[0];
+			ToM.m_Ambient.y = rMaterial.m_Ambient[1];
+			ToM.m_Ambient.z = rMaterial.m_Ambient[2];
+			ToM.m_Ambient.w = rMaterial.m_Ambient[3];
+			//! エミッシブ（放射光）
+			ToM.m_Emissive.x = rMaterial.m_Emissive[0];
+			ToM.m_Emissive.y = rMaterial.m_Emissive[1];
+			ToM.m_Emissive.z = rMaterial.m_Emissive[2];
+			ToM.m_Emissive.w = rMaterial.m_Emissive[3];
+			auto pTexture = Reader.ReadArray<wchar_t>(TextureFileNameSize / sizeof(wchar_t));
+			wstring TextureFileStr = pTexture;
+			TextureFileStr = BinDataDir + TextureFileStr;
+			ToM.m_TextureResource = ObjectFactory::Create<TextureResource>(TextureFileStr);
+			materials.push_back(ToM);
+		}
+
+		//ボーン数
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::BoneCount){
+			throw BaseException(
+				L"ボーン数のヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseBoneData()"
+				);
+		}
+		BoneCount = blockHeader.m_Size;
+		//ボーンアニメーション行列
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::AnimeMatrix){
+			throw BaseException(
+				L"アニメーション行列のヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseBoneData()"
+				);
+		}
+		auto MatrixSize = blockHeader.m_Size / sizeof(MatrixPOD);
+		auto pAnimeMatrix = Reader.ReadArray<MatrixPOD>((size_t)MatrixSize);
+		for (UINT i = 0; i < MatrixSize; i++){
+			//ボーン単位ではなく行列単位で読み込む
+			Matrix4X4 mat;
+			for (int u = 0; u < 4; u++){
+				for (int v = 0; v < 4; v++){
+					mat(u, v) = pAnimeMatrix->m_Mat[u][v];
+				}
+			}
+			bonematrix.push_back(mat);
+			pAnimeMatrix++;
+		}
+		SampleCount = MatrixSize / BoneCount;
+
+		//End
+		blockHeader = Reader.Read<BlockHeader>();
+		if (blockHeader.m_Type != BlockType::End){
+			throw BaseException(
+				L"終了ヘッダが違います",
+				DataFile,
+				L"MeshResource::ReadBaseBoneData()"
+				);
+		}
+
+
+	}
+
+
+
+	shared_ptr<MeshResource> MeshResource::CreateStaticModelMesh(const wstring& BinDataDir, const wstring& BinDataFile, bool AccessWrite){
+		try {
+			//頂点配列
+			vector<VertexPositionNormalTexture> vertices;
+			//インデックスを作成するための配列
+			vector<uint16_t> indices;
+			//マテリアルを設定する配列
+			vector<MaterialEx> Materials;
+			ReadBaseData(BinDataDir, BinDataFile,vertices, indices, Materials);
+			auto Ptr = MeshResource::CreateMeshResource<VertexPositionNormalTexture>(vertices, indices, AccessWrite);
+			Ptr->m_MaterialExVec.clear();
+			for (auto& v : Materials){
+				Ptr->m_MaterialExVec.push_back(v);
+			}
+			return Ptr;
+		}
+		catch (...) {
+			throw;
+		}
+	}
+
+
+	shared_ptr<MeshResource> MeshResource::CreateBoneModelMesh(const wstring& BinDataDir,
+		const wstring& BinDataFile, bool AccessWrite){
+		try {
+			//頂点配列
+			vector<VertexPositionNormalTextureSkinning> vertices;
+			//インデックスを作成するための配列
+			vector<uint16_t> indices;
+			//マテリアルを設定する配列
+			vector<MaterialEx> Materials;
+			//サンプリング行列
+			vector<Matrix4X4> SampleMatrices;
+			//ボーン数
+			UINT BoneCount;
+			//サンプル数
+			UINT SampleCount;
+			ReadBaseBoneData(BinDataDir, BinDataFile,vertices, indices, Materials,
+				SampleMatrices, BoneCount, SampleCount);
+			auto Ptr = MeshResource::CreateMeshResource<VertexPositionNormalTextureSkinning>(vertices, indices, AccessWrite);
+			Ptr->m_MaterialExVec.clear();
+			for (auto& v : Materials){
+				Ptr->m_MaterialExVec.push_back(v);
+			}
+			Ptr->m_SampleMatrixVec.clear();
+			for (auto& v : SampleMatrices){
+				Ptr->m_SampleMatrixVec.push_back(v);
+			}
+			Ptr->m_BoneCount = BoneCount;
+			Ptr->m_SampleCount = SampleCount;
+			Ptr->m_IsSkining = true;
+			return Ptr;
+		}
+		catch (...) {
+			throw;
+		}
+
+	}
+
 
 
 
