@@ -1,0 +1,227 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>４．独自の頂点と独自描画</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>４０５．頂点を自作する１</h3>
+　この項では、オブジェクトの頂点を自作する方法を説明します。<br />
+　<b>DxBase2016</b>では、オブジェクトの<b>頂点バッファ、インデックスバッファなど</b>を、主に<b>メッシュリソース</b>という単位で管理します。このようにしておくと、<b>リソース登録</b>することにより、ゲーム中再利用できるオブジェクトを作成できます。<br />
+　では再利用しないオブジェクトであれば、<b>メッシュリソース</b>を作成できないのかといえば、そうではありません、<b>サンプル404</b>の<b>FixedBoxManagerクラス</b>のように、<b>リソースをメンバとして持つ</b>こともできます。<br />
+　この項では、独自の頂点を定義し、そこから<b>メッシュリソース</b>を作成する方法と、その頂点を変更する方法を説明します。<br />
+　しかし、今回の方法がとれるのは、頂点の型が<b>VertexPositionNormalTexture</b>の場合のみです。ほかの方の場合は、<b>頂点バッファ、インデックスバッファなど</b>を独自で管理する必要があります。その方法は次項で述べます。<br />
+<br />
+<h4>頂点とインデックスを作成する</h4>
+　<b>Sample405ディレクトリ</b>のソリューションを開いてリビルド、実行すると以下の画面が現れます。
+<p>&nbsp;</p>
+<img src="img/4005a.jpg" width="80%"/>
+<p>図4005a</p>
+<p>&nbsp;</p>
+　ここでは<b>サンプル402で紹介したような</b>直方体のオブジェクトがあり、上部の面が形状が変化します。このようなオブジェクトを作成するためには、<b>独自のメッシュリソース</b>を作成する必要があります。<br />
+　まず、<b>頂点バッファとインデックスバッファ</b>を作成して、<b>メッシュリソース</b>を作成する部分は、<b>Character.cpp</b>の<b>CustomDrawBox::CreateMeshResource()</b>にあります。<br />
+<div class="box1">
+<pre>
+    void CustomDrawBox::CreateMeshResource(){
+        vector&lt;VertexPositionNormalTexture> vertices;
+        vector&lt;uint16_t> indices;
+        //Face数は6
+        const int FaceCount = 6;
+        static const Vector3 faceNormals[FaceCount] =
+        {
+            { 0, 0, 1 },
+            { 0, 0, -1 },
+            { 1, 0, 0 },
+            { -1, 0, 0 },
+            { 0, 1, 0 },
+            { 0, -1, 0 },
+        };
+        static const Vector2 textureCoordinates[4] =
+        {
+            { 1, 0 },
+            { 1, 1 },
+            { 0, 1 },
+            { 0, 0 },
+        };
+        //１辺の長さはの半分は0.5
+        float size = 0.5f;
+        for (int i = 0; i &lt; FaceCount; i++)
+        {
+            //法線
+            auto normal = faceNormals[i];
+            auto basis = (i >= 4) ? Vector3(0, 0, 1) : Vector3(0, 1, 0);
+            auto side1 = Vector3EX::Cross(normal, basis);
+            auto side2 = Vector3EX::Cross(normal, side1);
+            //インデックスの登録
+            size_t vbase = vertices.size();
+            indices.push_back((uint16_t)vbase + 0);
+            indices.push_back((uint16_t)vbase + 1);
+            indices.push_back((uint16_t)vbase + 2);
+            indices.push_back((uint16_t)vbase + 0);
+            indices.push_back((uint16_t)vbase + 2);
+            indices.push_back((uint16_t)vbase + 3);
+            //頂点の登録
+            vertices.push_back(VertexPositionNormalTexture((normal - side1 - side2) * size,
+                 normal, textureCoordinates[0]));
+            vertices.push_back(VertexPositionNormalTexture((normal - side1 + side2) * size,
+                 normal, textureCoordinates[1]));
+            vertices.push_back(VertexPositionNormalTexture((normal + side1 + side2) * size,
+                 normal, textureCoordinates[2]));
+            vertices.push_back(VertexPositionNormalTexture((normal + side1 - side2) * size,
+                 normal, textureCoordinates[3]));
+        }
+        //RHからLHに変更
+        if ((indices.size() % 3) != 0){
+            throw BaseException(
+                L"インデックスの数が合いません",
+                L"if((indices.size() % 3) == 0)",
+                L"CustomDrawBox::CreateMeshResource()"
+                );
+        }
+        for (auto it = indices.begin(); it != indices.end(); it += 3)
+        {
+            std::swap(*it, *(it + 2));
+        }
+        for (auto it = vertices.begin(); it != vertices.end(); ++it)
+        {
+            it->textureCoordinate.x = (1.f - it->textureCoordinate.x);
+        }
+        //頂点とインデックスの配列からメッシュリソースを作成（頂点を変更できる）
+        <span class="red">m_MeshResource = MeshResource::CreateMeshResource(vertices, indices, true);</span>
+    }
+</pre>
+</div>
+　最後の赤くなっている部分までは、<b>頂点の配列（VertexPositionNormalTexture型）の作成とインデックスの配列（uint16_t型）</b>を作成しているところです。<br />
+　作成が終わったら
+<div class="box1">
+<pre>
+        //頂点とインデックスの配列からメッシュリソースを作成（頂点を変更できる）
+        <span class="red">m_MeshResource = MeshResource::CreateMeshResource(vertices, indices, true);</span>
+</pre>
+</div>
+　で、メッシュリソースを作成できます。<br/>
+　メッシュリソースを作成できたら、あとは、描画コンポーネントにこのメッシュを渡すことが可能になります。<br />
+　以下が<b>OnCreate()関数</b>です。ここでは、上記関数を呼んだ後、いつものように、描画コンポーネントや影の設定を行ってます。
+<div class="box1">
+<pre>
+    void CustomDrawBox::OnCreate(){
+        auto Ptr = AddComponent&lt;Transform>();
+        Ptr->SetScale(m_StartScale);
+        Ptr->SetPosition(m_StartPos);
+        Ptr->SetRotation(m_StartRotation);
+        <span class="red">//頂点バッファとインデックスバッファを作成
+        CreateMeshResource();</span>
+        //影をつける（シャドウマップを描画する）
+        auto ShadowPtr = AddComponent&lt;Shadowmap>();
+        //影の形（メッシュ）を設定
+        ShadowPtr->SetMeshResource(m_MeshResource);
+        //描画コンポーネントの追加
+        auto DrawComp = AddComponent&lt;PNTStaticDraw>();
+        //描画コンポーネントに形状（メッシュ）を設定
+        DrawComp->SetMeshResource(m_MeshResource);
+        //描画コンポーネントテクスチャの設定
+        DrawComp->SetTextureResource(L"TRACE_TX");
+        //透明処理（描画順制御のため）
+        SetAlphaActive(true);
+    }
+</pre>
+</div>
+
+<br/>
+　それで、頂点の変更は、<b>CustomDrawBox::UpdateMeshResource()</b>にあります。
+<div class="box1">
+<pre>
+    void CustomDrawBox::UpdateMeshResource(){
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        m_TotalTime += ElapsedTime;
+        //座標を変更する
+        auto Dev = App::GetApp()->GetDeviceResources();
+        ID3D11Device* pDx11Device = Dev->GetD3DDevice();
+        ID3D11DeviceContext* pID3D11DeviceContext = Dev->GetD3DDeviceContext();
+        //頂点バッファをリソースから取り出す
+        auto pVertexBuffer = m_MeshResource->GetVertexBuffer().Get();
+        //バックアップの頂点を取り出す
+        auto& BacukVertices = m_MeshResource->GetBackupVerteces&lt;VertexPositionNormalTexture>();
+
+        //D3D11_MAP_WRITE_DISCARDは重要。この処理により、GPUに邪魔されない
+        <span class="red">D3D11_MAP mapType = D3D11_MAP_WRITE_DISCARD;
+        D3D11_MAPPED_SUBRESOURCE mappedBuffer;
+        //頂点のマップ
+        if (FAILED(pID3D11DeviceContext->Map(pVertexBuffer, 0, mapType, 0, &mappedBuffer))){
+            // Map失敗
+            throw BaseException(
+                L"頂点のMapに失敗しました。",
+                L"if(FAILED(pID3D11DeviceContext->Map()))",
+                L"CustomDrawBox::UpdateMeshResource()"
+                );
+        }</span>
+        //頂点の変更
+        VertexPositionNormalTexture* vertices 
+            = (VertexPositionNormalTexture*)mappedBuffer.pData;
+        for (size_t i = 0; i &lt; m_MeshResource->GetNumVertices(); i++){
+            Vector3 Pos = BacukVertices[i].position;
+            if (Pos.x > 0 && Pos.y > 0 && Pos.z > 0){
+                //サインを使っていったり来たりするようにする
+                Pos.y += sin(m_TotalTime);
+            }
+            else if (Pos.x &lt; 0 && Pos.y > 0 && Pos.z &lt; 0){
+                //サインを使っていったり来たりするようにする
+                Pos.y -= sin(m_TotalTime);
+            }
+            vertices[i] = VertexPositionNormalTexture(
+                Pos,
+                BacukVertices[i].normal,
+                BacukVertices[i].textureCoordinate
+                );
+
+        }
+        //アンマップ
+        <span class="red">pID3D11DeviceContext->Unmap(pVertexBuffer, 0);</span>
+    }
+</pre>
+</div>
+　重要なのは、<b>マップとアンマップ</b>です。この操作をしないと、GPUに作業を邪魔されます。また、バックアップの頂点を基準にすべての頂点の変更をしなければいけません（つまり、変更箇所のみの変更はできない）。このことは重要です。頂点の数が、あまり多くない場合はそれほどストレスにはなりませんんが、大量の頂点を持ってる場合はストレスになります。そんな場合は<b>サンプル403</b>で紹介したように<b>頂点シェーダでの変更</b>をします。<br/>
+　また、<b>モデル</b>の場合は、このような直接頂点の修正はせずに、<b>ボーンアニメーション</b>で変更してください。<b>ボーンアニメーション</b>はシェーダで処理されるので高速です。<br />
+<br />
+<h4>頂点やインデックスの作成にライブラリを使う</h4>
+　このサンプルでのオブジェクトは<b>立方体を変形</b>させたものです。そういう意味では、フレームワークに内蔵されている<b>DEFAULT_CUBE</b>と同じもので、本来ならわざわざ作成する必要がありません。<br />
+　このほかにも<b>DxBase2016</b>には<b>平面、球、カプセル、コーン、シリンダー、トーラス、正4面体、正8面体、正12面体、正20面体</b>を作成することができます。もしこれらの形状をそのまま使用するか、あるいは一部削るなどで用が足りるのであれば、わざわざ形状を作成するアルゴリズムを考える必要がありません。<br />
+　上記紹介した<b>CustomDrawBox::CreateMeshResource()関数</b>を以下のように書き換えてみましょう。（コメントになってます）
+<div class="box1">
+<pre>
+    //上記の関数は以下のようにも書ける
+    void CustomDrawBox::CreateMeshResource(){
+        vector&lt;VertexPositionNormalTexture> vertices;
+        vector&lt;uint16_t> indices;
+        VertexUtil::CreateCube(1.0f, vertices, indices);
+        //頂点とインデックスの配列からメッシュリソースを作成（頂点を変更できる）
+        m_MeshResource = MeshResource::CreateMeshResource(vertices, indices, true);
+    }
+</pre>
+</div>
+　これでも、内容的には全く同じになります。このほかに、<b>CreateSphere()、CreateCapsule()、CreateCylinder()</b>など、頂点とインデックスの配列を渡せば形状を作成してくれる関数があります。用途に合わせて利用するとよいでしょう。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="40_04.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="40_06.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

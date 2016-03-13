@@ -1,0 +1,133 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>４．独自の頂点と独自描画</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>４０７．線と点の描画</h3>
+　今までは、オブジェクトの<b>面</b>の描画に<b>三角形</b>を使ってました。３Ｄにせよ２Ｄにせよ、<b>座標上の３つの点</b>が決定すれば、そのオブジェクトの<b>面</b>が確定します。<br />
+　では、<b>線や点</b>はどうかというと、もっと単純です。線は２点が決定すれば確定しますし、点もいわゆる<b>ポジション</b>ですから、それ以上でも以下でもありません。<br />
+　<b>DxBase2016</b>には、<b>線や点を描画するクラスなど</b>はありません。パーティクルエフェクトは<b>面</b>ですから、点や線ではありません。<br />
+　なぜ用意されてないかといいますと、<b>線や点</b>の描画を、特定のクラスなどで仕様をある程度縛ってしまうと、かえって不便になる、という理由と、DirecvtX11で直接描画しても、さほど（<b>２Ｄ３Ｄの描画に比べて</b>）大変ではないからです。<br />
+　この項では、<b>線と点</b>の簡単な作成方法を紹介します。<br />
+<br />
+<h4>頂点の作成</h4>
+　まず、<b>線の描画</b>から紹介します。<br />
+　<b>Sample407ディレクトリ</b>のソリューションを開いて、リビルド、実行しますと以下の画面が現れます。
+<p>&nbsp;</p>
+<img src="img/4007a.jpg" width="80%"/>
+<p>図4007a</p>
+<p>&nbsp;</p>
+　カメラ奥の方にくるくる回る物体があります。これは、線の集合（配列）として表現されています。<br />
+　今回のサンプルは、前項のサンプルを少し修正して使用してます。ですので、<b>前項のサンプルの応用</b>の指針にもなると思います。<br />
+　まず、前項サンプルにあった<b>シャドウマップ関連</b>のクラスやシェーダは削除します。<br />
+　そうしたうえで、まず、<b>頂点バッファの作成</b>から行います。今回の頂点は<b>VertexPositionColor型</b>です。すなわち<b>ポジションと色</b>を持つ頂点となります。<br />
+　頂点バッファの作成は<b>CustomDrawVortex::CreateCustomMesh()関数</b>で行います。
+<div class="box1">
+<pre>
+    void CustomDrawVortex::CreateCustomMesh(){
+        m_BackupVirtex.clear();
+        float rot = 0.0f;
+        float Min = 1.0f / 50.0f;
+        for (size_t i = 0; i &lt; 50; i++){
+            m_BackupVirtex.push_back(
+                VertexPositionColor(
+                Vector3(sin(rot), (float)i * 0.05f, cos(rot)),  //渦巻き状になるよう初期化
+                Color4(1.0, Min * i, 0.0, 1.0)
+                )
+                );
+            rot += 0.5f;
+        }
+        //頂点バッファの作成（頂点を変更できる）
+        <span class="red">VertexUtil::CreateDynamicVertexBuffer(m_VertexBuffer, m_BackupVirtex);</span>
+        //頂点数の設定
+        m_NumVertices = static_cast&lt;UINT>(m_BackupVirtex.size());
+    }
+</pre>
+</div>
+　ここでバックアップ用に作成している<b>m_BackupVirtex</b>は<b>VertexPositionColor型</b>の配列です。前項とは変わっていますので注意してください。<br />
+　ここでは、頂点を渦巻き状になるように設定しています。渦巻きを求めるのに、<b>sinとcos</b>を利用しています。
+　頂点バッファの作成は、前項と同じように<b>VertexUtil::CreateDynamicVertexBuffer()テンプレート関数</b>を利用しています。この関数はテンプレートなので、頂点の配列の型が変わっても利用できます。<br />
+<br />
+<h4>シェーダの作成</h4>
+　シェーダも、前項のシェーダを修正して作成します。それぞれ、<b>VertexPositionColor型</b>を受け付けるように修正します。<br />
+　また、ライティングやテクスチャは今回は利用しませんので、削除します。<br />
+　cpp側では、<b>CustomDrawConstantBuffer構造体</b>や、<b>頂点シェーダクラスに渡す頂点の型</b>も変わっていますので注意しましょう。<br />
+　このように、<b>頂点を自作したりシェーダを自作する</b>場合は、<b>必要としている頂点の型はどの型で、それをシェーダに渡すためにはどのようなコンスタントバッファが必要</b>か、に注意を払う必要があります。ここに一貫性がないと、<b>お化けのようなオブジェクト</b>が表示されたり、逆に<b>全く表示されなかったり</b>します。<br/>
+<br />
+<h4>更新</h4>
+　頂点の変更は、<b>CustomDrawVortex::UpdateCustomMesh()</b>で行います。前項のようにバックアップから修正する場所のみ修正して、頂点全体を更新します。<br />
+<br />
+<h4>線の描画</h4>
+　描画は、<b> CustomDrawVortex::OnDraw()</b>で行います。重要な部分のみ抜粋します。
+<div class="box1">
+<pre>
+    void CustomDrawVortex::OnDraw(){
+
+        //中略
+
+        //描画方法
+        <span class="red">pID3D11DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);</span>
+        //描画
+        <span class="red">pID3D11DeviceContext->Draw(m_NumVertices, 0);</span>
+
+        //中略
+    }
+</pre>
+</div>
+　このように、<b>pID3D11DeviceContext->IASetPrimitiveTopology()関数</b>に、<b>D3D11_PRIMITIVE_TOPOLOGY_LINELIST</b>を渡すことで線の描画になります。<br />
+　また、今回は、インデックスによる描画を使用せずに、<b>pID3D11DeviceContext->Draw()関数</b>を利用します。パラメータに描画すべき頂点の数と、開始地点を渡します。<br />
+<br />
+<h4>点の描画</h4>
+　さて、<b>点の描画</b>ですが、<b>線の描画</b>が実装されていれば、点に変更するのは簡単です。（もちろん最初から<b>点</b>として描画するために頂点を作成しても問題ありません）。<br />
+　今回のサンプルで、<b>線を点に変更</b>するのには、<b> CustomDrawVortex::OnDraw()</b>で以下のように変更します。
+<div class="box1">
+<pre>
+    void CustomDrawVortex::OnDraw(){
+
+        //中略
+
+        //描画方法
+        <span class="red">pID3D11DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);</span>
+
+        //中略
+    }
+</pre>
+</div>
+　これで、点の描画になります。<br />
+　以下のような実行画面です。
+<p>&nbsp;</p>
+<img src="img/4007b.jpg" width="80%"/>
+<p>図4007b</p>
+<p>&nbsp;</p>
+　渦巻きの回転が速いのでちょっと見にくいかもしれません。その場合は回転をゆっくりにしてみてください。<br/>
+　<b>CustomDrawVortex::UpdateCustomMesh()</b>で調整できます。<br />
+<br />
+　この項では、頂点の配列を作成して、それを<b>線もしくは点</b>で描画する方法を紹介しました。<br />
+　特に<b>線の描画</b>は<b>雨を作ったり集中線を描いたり</b>などに利用方法はいろいろあると思いますので、パーティクルエフェクトと合わせて、演出に利用するとゲームの楽しさが増すと思いますので、いろいろ試してみましょう。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="40_06.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="40_08.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

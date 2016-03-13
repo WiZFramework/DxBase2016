@@ -1,0 +1,172 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>４．独自の頂点と独自描画</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>４０３．頂点シェーダとピクセルシェーダの自作２</h3>
+　前項では、基本的な頂点シェーダとピクセルシェーダの作成をしてみました。<br />
+　しかし、前項で説明したのは<b>まさに基本的な３Ｄ描画</b>であり、ライブラリに実装してあるシェーダーと大きくはかわりません。ライティングついて言えば、むしろライブラリ実装版のほうがもっと精度も高いです。<br />
+　<b>シェーダを自作する</b>ということは、<b>デフォルトの描画では物足りない</b>場合がほとんどですし、そうあるべきでしょう。<br />
+　そこでこの項では、前項のシェーダを少しいじって、ちょっと変わった描画を行います。<br />
+　<b>Sample403</b>のソリューションを開いてリビルド、実行すると以下の画面が現れます。
+<p>&nbsp;</p>
+<img src="img/4003a.jpg" width="80%"/>
+<p>図4003a</p>
+<p>&nbsp;</p>
+　配置されているボックスは前項とあまり変わりませんが、ボックスの一部が上に上がったり下がったりしています。<br />
+　しかしながら、影は変化ありません。この処理は、いったいどうやっているのでしょうか？<br />
+　答えは頂点シェーダにあります。<br />
+<br />
+<h4>頂点シェーダーの修正</h4>
+　まず、前項の、シェーダ側コンスタントバッファを見てみると
+<div class="box1">
+<pre>
+cbuffer SimpleConstantBuffer : register(b0)
+{
+    float4x4 World  : packoffset(c0);
+    float4x4 View   : packoffset(c4);
+    float4x4 Projection : packoffset(c8);
+    float4 LightDir : packoffset(c12);
+    <span class="red">float4 Param : packoffset(c13);</span>
+};
+</pre>
+</div>
+　のように、<b>float4 Param</b>というメンバがあります。<br />
+　この変数は、floatを4つ入れられる変数で、汎用的に使用できます。今回はここに、経過時間をセットしてシェーダー内で頂点を変化させます。<br />
+　頂点シェーダへの入力を以下のように変えます。
+<div class="box1">
+<pre>
+struct VertexShaderInput
+{
+    float4 pos : SV_Position;
+    float3 norm : NORMAL;
+    float2 tex : TEXCOORD0;
+    <span class="red">uint id : SV_VERTEXID;</span>
+};
+</pre>
+</div>
+　ここで赤くなっているメンバは<b>SV_VERTEXID</b>というセマンティックがあります。これは<b>頂点のID</b>という意味で、シェーダ内で、頂点のインデックスを取得できます。<br />
+　頂点シェーダ本体は以下のようになります。
+<div class="box1">
+<pre>
+#include "SimpleInc.hlsli"
+
+PixelShaderInput main(VertexShaderInput input)
+{
+    //ピクセルシェーダーに渡す変数
+    PixelShaderInput vertexShaderOutput;
+    //頂点の位置を変換
+    float4 pos = float4(input.pos.xyz, 1.0f);
+    <span class="red">//Posを調整して遊んでみる
+    if (input.id == 0 || input.id == 1 || input.id == 2 || input.id == 3){
+        pos.y += Param.x;
+    }</span>
+    //ワールド変換
+    pos = mul(pos, World);
+    //ビュー変換
+    pos = mul(pos, View);
+    //射影変換
+    pos = mul(pos, Projection);
+    //ピクセルシェーダに渡す変数に設定
+    vertexShaderOutput.pos = pos;
+    //テクスチャのUV値を設定
+    vertexShaderOutput.tex = input.tex;
+    //ライティング用に法線をワールド変換して設定
+    vertexShaderOutput.norm = mul(input.norm, (float3x3)World);
+    //ピクセルシェーダに出力
+    //returnはピクセルシェーダに渡すことを意味する
+    return vertexShaderOutput;
+}
+</pre>
+</div>
+　ここで赤くなっているところで位置を調整しています。<b>input.id</b>は頂点のインデックスです。<b>Param.x</b>は、C++から時間（タイム）が与えられます。<br />
+　以下が、C++でシェーダにタイムを渡しているところです。<b>Draw()内</b>に記述します。
+<div class="box1">
+<pre>
+    void CustomDrawBox::Draw(){
+        //デバイスの取得
+        //中略
+
+        //コンスタントバッファの設定
+        ConstantBuffer cb1;
+        ZeroMemory(&cb1, sizeof(cb1));
+        //行列の設定(転置する)
+        cb1.World = Matrix4X4EX::Transpose(PtrT->GetWorldMatrix());;
+        cb1.View = Matrix4X4EX::Transpose(View);
+        cb1.Projection = Matrix4X4EX::Transpose(Proj);
+        //ライトの設定
+        //ステージから0番目のライトを取り出す
+        auto PtrLight = GetStage()->GetTargetLight(0);
+        cb1.LightDir = PtrLight->GetDirectional();
+        //xとzだけ逆にする
+        cb1.LightDir.x *= -1.0f;
+        cb1.LightDir.z *= -1.0f;
+        cb1.LightDir.w = 1.0f;
+        <span class="red">//トータルタイムをコンスタントバッファに渡す
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        m_TotalTime += ElapsedTime;
+        if (m_TotalTime >= 1.0f){
+            m_TotalTime = 0.0f;
+        }
+        cb1.Param.x = m_TotalTime;</span>
+        //コンスタントバッファの更新
+        pID3D11DeviceContext->UpdateSubresource(m_ConstantBuffer->GetBuffer(), 0, nullptr, &cb1, 0, 0);
+        //コンスタントバッファの設定
+        ID3D11Buffer* pConstantBuffer = m_ConstantBuffer->GetBuffer();
+        pID3D11DeviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+        pID3D11DeviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
+
+        //レンダリングステート
+        pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullFront());
+        //内側描画
+        pID3D11DeviceContext->DrawIndexed(PtrMeshResource->GetNumIndicis(), 0, 0);
+
+        //ライトの向きを変える
+        cb1.LightDir = PtrLight->GetDirectional();
+        cb1.LightDir.w = 1.0f;
+
+        //コンスタントバッファの更新
+        pID3D11DeviceContext->UpdateSubresource(m_ConstantBuffer->GetBuffer(), 0, nullptr, &cb1, 0, 0);
+        //コンスタントバッファの設定
+        pConstantBuffer = m_ConstantBuffer->GetBuffer();
+        pID3D11DeviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+        pID3D11DeviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
+
+        //レンダリングステート
+        pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullBack());
+        //描画（外側）
+        pID3D11DeviceContext->DrawIndexed(PtrMeshResource->GetNumIndicis(), 0, 0);
+        //後始末
+        Dev->InitializeStates(RenderStatePtr);
+    }
+</pre>
+</div>
+　内側描画と外側描画時に、コンスタントバッファは変更して渡しているのに注意してください。<br />
+　これはライティングの角度を調整するためです。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="40_02.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="40_04.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

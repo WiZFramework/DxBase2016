@@ -1,0 +1,369 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>４．独自の頂点と独自描画</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>４０１．三角形の単純描画</h3>
+　４章は、<b>DxBase2016</b>が持つ、<b>DirectX11</b>に直接アクセスするインターフェイスの説明です。<br />
+　３章までの説明とは違い、この章では<b>DirectX11の用語</b>がいたるところに出てきます。ですから、読み進めるためには、<b>DirectX11の知識</b>が多少必要になります。出てくる都度説明するように心がけますが、深い部分は各自、<b>DirectX11のマニュアル</b>、を調べながらの実装になるかと思います。<br />
+　<b>DirectX11のマニュアル</b>はMSDNのサイトで調べられます。検索エンジン等で、たとえば<b>MSDN ID3D11DeviceContext2</b>などと検索すると、英語ですが、インターフェイスの説明のサイトにたどり着きます。<br />
+　しばらくはそういったマニュアルと格闘する形になるでしょう。<br />
+　また、ブログなどでサンプルを公開しているプログラマ諸氏もいます。思うようにいかない場合は、そういったサイトの活用も必要でしょう。<br />
+　いずれにせよ、そんなに簡単なことではありません。しかし、ある程度自分の思い通りに組めるようになると、<b>DirectX11</b>が、いかに<b>夢への切符</b>であるかを実感するでしょう。<br />
+<br/>
+　それでは、まず、<b>デバイス座標</b>直接書き込むサンプルから紹介しましょう。<br />
+<br />
+<h4>デバイス座標</h4>
+　<b>DirectX11</b>を直接操作するためには、<b>DirectX11の座標系</b>について知らなければなりません。<br />
+　ここでいう座標系とは、<b>デバイスの座標系</b>です。よく右手座標とか左手座標とかは耳にしたことがあると思います。<b>DirectX11</b>は<b>通常左手座標</b>を使用しています<b>DxBase2016</b>も<b>左手座標系</b>です。右手と左手の違いは、<b>Z方向が奥に向かうか、手前に向かうか</b>の違いです。<b>左手座標系</b>は<b>奥に向かうほど大きく</b>なります。<br />
+　ということで<b>DirectX11</b>のデバイス座標系は以下のようになります。
+<p>&nbsp;</p>
+<img src="img/4001a.jpg" width="80%"/>
+<p>図4001a</p>
+<p>&nbsp;</p>
+　X方向が、左から右に向かって、<b>-1.0から1.0の範囲</b>になります。<br />
+　Y方向が、下から上に向かって、<b>-1.0から1.0の範囲</b>になります。<br />
+　Z方向が、手前から奥に向かって、<b>0.0から1.0の範囲</b>になります。<br />
+<br />
+　こうしてみると、<b>Z方向だけが、範囲が狭い</b>ことがわかります。<br />
+<br />
+　<b>DirectX11</b>では、<b>この範囲に何かの色</b>を書き込みます。ディスプレイデバイスは結局のところ<b>ドットの集合体</b>です。ですから、その目的のドットに色を書き込むことで、何らかの表現を行います。<br />
+　これまで、ワールド変換とか、頂点とか、カメラとか、いろんな要素が出てきました。しかし、それらは最終的に<b>デバイス座標に書き込む色</b>を決定する手段にすぎません。<br />
+　つまり、あらゆる３Ｄ的計算が、デバイスに書き込む色の計算、だったのです！（なーんだ）<br />
+　逆に言えば、<b>DirectX11</b>を直接操作するということは、その<b>書き込む色を手動で計算し、決定する</b>ということです。<br/>
+<br />
+<h4>デバイス座標に直接描画する</h4>
+　<b>Sample401</b>は、デバイス座標が単純にドットの集合である、ということを説明するものです。<br/>
+　<b>Sample401ディレクトリ</b>のソリューションを開き、リビルド、実行すると以下のような画面が現れます。
+<p>&nbsp;</p>
+<img src="img/4001b.jpg" width="80%"/>
+<p>図4001b</p>
+<p>&nbsp;</p>
+　黄色い三角形が描画されるだけです。このサンプルは、ほとんど３Ｄ的な計算をせずに、デバイス座標に色を描画しています。<br />
+　まず、<b>Charactor.h、cpp</b>に記述されている、<b>TriangleObjectクラス</b>を見ていきましょう。<br />
+　以下は、ヘッダファイルにある宣言部です。
+<div class="box1">
+<pre>
+    class TriangleObject : public GameObject{
+        //バッファ関連
+        <span class="red">ComPtr&lt;ID3D11Buffer> m_VertexBuffer;   //頂点バッファ</span>
+        UINT m_NumVertices;             //頂点の数
+    public:
+        //構築と破棄
+        TriangleObject(const shared_ptr&lt;Stage>& StagePtr);
+        virtual ~TriangleObject();
+        //初期化
+        virtual void OnCreate() override;
+        <span class="red">//描画
+        virtual void OnDraw()override;</span>
+    };
+</pre>
+</div>
+　ここでは、コンストラクタデストラクタのほかに、仮想関数として、<b>OnCreate()とOnDraw()</b>が多重定義されています。<br/>
+　これまでのサンプルでは<b>OnDraw()</b>を記述することはありませんでした。<b>目的のDrawコンポーネント</b>を指定し、実際の描画はそのコンポーネントに任せていました。<br />
+　しかし、この章（４章）での主役は<b>OnDraw()</b>です。この仮想関数を多重定義することで、自由自在の描画を実装することができます。<br />
+　また、ヘッダには<b>m_VertexBuffer</b>という<b>頂点バッファの変数</b>が宣言されています。<br />
+　この型名である<b>ComPtr&lt;ID3D11Buffer></b>というのは、<b>comコンポーネントインターフェイスのポインタ</b>を内包するテンプレートクラスです。shared_ptrのように使用することができます。<br />
+<div class="box1">
+<pre>
+　ID3D11Buffer* m_pVertexBuffer;
+</pre>
+</div>
+　のように生ポインタとして持ち、自分で管理することも可能ですが、<b>ComPtr</b>を使用した方が、オブジェクトの解放を自動的に行ってくれるので便利です。ちなみに、<b>ComPtr</b>は<b>WindowSDK</b>の一部です。<br/>
+<br />
+　ここで盛んに出てくる、<b>COMとインターフェイス</b>について簡単に説明します。<br />
+　<b>COM</b>というのは<b>コンポーネントオブジェクトモデル</b>の略で、簡単に言えば<b>多言語からアクセスできるdll（ダイナミックリンクライブラリ）</b>と考えることができます。多言語というのはプログラミング言語のことです。COMはC++からのみならずC#やVisualBasecからも利用することができます。<br/>
+　<b>DirectXやXMLの項で説明したMSXML</b>など、<b>DxBase2015で使用されるCOM</b>はいくつもあります。それぞれ<b>インターフェイス</b>というオブジェクトのポインタを取得し、それを介してメンバ関数などにアクセスします。<b>ID3D11Buffer</b>のように<b>I</b>で始まる型名をもってるのが<b>インターフェイス</b>です。また<b>インターフェイス</b>は前述したように<b>ComPtr</b>を介して保持することもできます、<br />
+<br/>
+　<b>DirectX11</b>が持つインターフェイスは多岐にわたります。一番基本になるインターフェイスは<b>ID3D11Device</b>です。<b>DxBase2016</b>はそのバージョンアップ版である<b>ID3D11Device2</b>を使用しています。<br />
+　<b>DirectX11</b>の場合、まず<b>ID3D11Device</b>を取得した後、それを介して、<b>ID3D11DeviceContextやIDXGISwapChain</b>を取得します。それぞれに役割があるのですが、<b>ID3D11DeviceContext（実際に実装されているのはID3D11DeviceContext2）</b>が、とりあえず重要です。重要ですが、これらは起動時にフレームワークが取得してありますので、必要になったときにポインタを得れば良いようになってます。<br />
+<br />
+　さて、デバイス座標に実際に何かを書き込む場合、ここでも<b>インターフェイスが必要</b>になります。<br />
+　まず必要なのが<b>頂点バッファ</b>と呼ばれる<b>頂点データそのもの</b>です。<br />
+　実体はメモリ領域なのでしょうが、C++のnewで作成するのではなく、DirectX11のAPIを使って作成します。<br />
+　<b>TriangleObjectクラス</b>では、
+<div class="box1">
+<pre>
+        <span class="red">ComPtr&lt;ID3D11Buffer> m_VertexBuffer;   //頂点バッファ</span>
+</pre>
+</div>
+　という形で保持しておきます。<br />
+　そしてその領域を確保して、データをセットするのが、<b>OnCreate()関数</b>での以下の処理になります。
+<div class="box1">
+<pre>
+    void TriangleObject::OnCreate(){
+        <span class="red">//頂点を作成するための配列
+        vector&lt;VertexPosition> vertices = {
+            { VertexPosition(Vector3(0.0f, 0.5f, 0.5f)) },
+            { VertexPosition(Vector3(0.5f, -0.5f, 0.5f)) },
+            { VertexPosition(Vector3(-0.5f, -0.5f, 0.5f)) },
+        };
+        VertexUtil::CreateVertexBuffer(m_VertexBuffer, vertices);</span>
+        //頂点数の設定
+        m_NumVertices = static_cast&lt;UINT>(vertices.size());
+    }
+</pre>
+</div>
+　<b>VertexUtil::CreateVertexBuffer()関数</b>はテンプレート関数になっています。この呼び出しを追いかけていくと最終的に、<b>pDx11Device->CreateBuffer()</b>という呼び出しに行き着きます。これは、<b>ID3D11Deviceインターフェイス</b>のメンバ関数（API）で、頂点バッファを作成して、そのポインタ（ID3D11Bufferのポインタ）をm_VertexBufferに代入します。興味ある人は追いかけてみてください。<br />
+　また、<b>OnCreate()関数</b>では、<b>m_NumVertices</b>に頂点数（つまり３）を代入しています。<br />
+　ここで作成している<b>頂点</b>は、上記のように<b>VertexPosition型</b>です。つまり、<b>位置情報しか持ってない頂点</b>となります。値は、<b>デバイスに直接描画</b>するので<b>デバイス座標系</b>の値をsetします。<br />
+　これまでのサンプルに出てきた<b>MeshResource</b>というクラスは、この<b>頂点バッファ（と後で説明するインデックスバッファ）</b>などのデータをカプセル化したものです。<b>DxBase2016</b>では、今回のサンプルのように、<b>MeshResource</b>を使わずに頂点データなどを作成することができます。<br />
+<br />
+<h4>三角形の描画</h4>
+　実際の描画は、<b>OnDraw()関数</b>で行います。<br />
+　<b>OnDraw()関数</b>の説明の前に、<b>デバイスに描画するにはどうしたらいいか</b>を説明します。<br />
+　まず、ここまで<b>デバイス</b>という言葉をあいまいに使ってましたが、実際に描画する先は<b>バックバッファやステンシルバッファ</b>と呼ばれる領域です。フレームワークでは、これらへの描画を積み重ねていって、最終的にフロントバッファ（つまりディスプレイそのもの）に転送します。<br />
+　具体的には、<b>バックバッファとステンシルバッファ</b>をクリアし、各オブジェクトの<b>OnDraw()関数</b>を呼び出し、最終的に<b>フロントバッファ</b>に転送するという操作を、ターン（約60分の1秒）に1回、行っています。<br />
+　ですから、各ゲームがそれぞれに記述しなければならないのは、フレームワークから呼び出され<b>OnDraw()関数呼び出し</b>にこたえることです。これを、仮想関数<b>OnDraw()</b>の多重定義の形で実装します。<br />
+<br />
+　DirectX11では、<b>仮想的なキャンバス</b>のようなものとして、<b>ID3D11DeviceContext</b>というインターフェイスを持っています。プログラマは、このインターフェイスを通してバックバッファやステンシルバッファにアクセスします。<br />
+　とはいえ、たとえばメモリのコピーのような方法でアクセスできるわけではありません。<b>シェーダ</b>と呼ばれる<b>描画方法を記述したプログラム</b>によって描画します。<br />
+　主なシェーダとして<b>頂点シェーダとピクセルシェーダ</b>があります。このほかに、<b>DxBase2016</b>が対応しているシェーダに<b>ジオメトリシェーダと計算シェーダ</b>があります。<br />
+　フレームワーク内では、<b>BaseLibフィルタ内</b>に基本的な描画に使用できる<b>頂点シェーダとピクセルシェーダ</b>が実装されています。これまでのサンプルでは、用意されているシェーダを使用してきました。<br />
+　では、このサンプルではどうかといいうと、やはり、あらかじめ用意されているシェーダを使います。しかし、これまでのサンプルのように<b>Drawコンポーネント</b>は利用しません。直接シェーダを設定して描画します。<br/>
+<br />
+　<b>OnDraw()</b>の説明をする前に、この描画で使用する<b>頂点シェーダとピクセルシェーダ</b>について説明します。<br />
+　<b>頂点シェーダ</b>とは、<b>一つ一つの頂点に対する計算方法</b>を記したプログラムです。通常、３Ｄオブジェクトでは、頂点バッファに入っているのは、<b>ローカル座標</b>という座標系で記述されたオブジェクトです。ローカル座標とは、通常原点を中心とした点の集合です。球体なら、原点を中心に、半径分外側にいくつもの点が実装されています。<br />
+　それを、<b>ワールド変換</b>という計算によって、ステージ上の位置に、拡大縮小、回転、移動、をかけます。<br />
+　続いて、<b>ビュー変換</b>という計算によって、カメラから見た位置に変換します。ここで、カメラ位置と注視点、そしてカメラの傾きが重要になります。<br />
+　最後に、<b>射影変換</b>によって、遠近法や正射影法を適用させ、上記<b>デバイス座標</b>の点に計算するのです。また、場合によっては<b>頂点の法線</b>を利用してライティング処理を行います。<br />
+　この計算を行うのが<b>頂点シェーダ</b>の役割です。DirectX11では、この計算プログラムを<b>頂点シェーダ</b>記述します。<br/>
+<br />
+　頂点シェーダによって各頂点がデバイス座標上のどの位置に描画されるかが決定します。そして、今度はそれらの点を結んで、デバイス座標上のピクセルに変換します。つまり、各頂点同士は離れていますので、これを補間処理によって間を埋めていくのです。これを<b>ラスタライザ</b>といいます。<br />
+　<b>ラスタライザ</b>はDirectXによって自動的に行われますので、この部分の計算式は記述する必要はありません。ただ、<b>ハルシェーダ、ドメインシェーダ、ジオメトリシェーダ</b>の3つのシェーダを、頂点シェーダとラスタライザの間に記述することも可能です。（DxBase2016はこのうち<b>ジオメトリシェーダ</b>に対応しています）。<br />
+　<b>ラスタライザ</b>が行われると、各オブジェクトがデバイス座標上のピクセルに変換されます。<br />
+　<b>ピクセルシェーダー</b>では、この各ピクセルに対する処理を記述します。<br />
+　ここでは各ピクセルに対する色の調整、陰影処理、テクスチャのマッピング処理、透明処理などなど、いわゆる<b>装飾</b>を施します。<br />
+　ピクセルシェーダの出力は、たんなる<b>色</b>です。ですから、頂点シェーダから始まる様々な計算処理を全く無視して勝手な色を出力することも可能です。<br />
+　そして、<b>頂点シェーダからピクセルシェーダまでの工程</b>は、流れ作業のようなものなので、総称して<b>グラフィックパイプライン</b>と呼ばれます。<br />
+<br />
+　それではいよいよ<b>OnDraw()関数</b>です。全ソースを紹介します。
+<div class="box1">
+<pre>
+    void TriangleObject::OnDraw(){
+
+        auto Dev = App::GetApp()->GetDeviceResources();
+        auto pD3D11DeviceContext = Dev->GetD3DDeviceContext();
+
+        //コンスタントバッファの準備
+        PDirectConstantBuffer sb;
+        sb.Diffuse = Color4(1.0f, 1.0f, 0, 1.0f);
+        //コンスタントバッファの更新
+        pD3D11DeviceContext->UpdateSubresource(CBPDirect::GetPtr()->GetBuffer(), 0, nullptr, &sb, 0, 0);
+
+        //ストライドとオフセット
+        UINT stride = sizeof(VertexPosition);
+        UINT offset = 0;
+        pD3D11DeviceContext->IASetVertexBuffers(0, 1, m_VertexBuffer.GetAddressOf(), &stride, &offset);
+        //描画方法（3角形）
+        pD3D11DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        //コンスタントバッファの設定
+        ID3D11Buffer* pConstantBuffer = CBPDirect::GetPtr()->GetBuffer();
+        ID3D11Buffer* pNullConstantBuffer = nullptr;
+        //頂点シェーダに渡す
+        pD3D11DeviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+        //ピクセルシェーダには渡さない（nullptrを渡す）
+        pD3D11DeviceContext->PSSetConstantBuffers(0, 1, &pNullConstantBuffer);
+        //シェーダの設定
+        pD3D11DeviceContext->VSSetShader(VSPDirect::GetPtr()->GetShader(), nullptr, 0);
+        pD3D11DeviceContext->PSSetShader(PSPDirect::GetPtr()->GetShader(), nullptr, 0);
+        //インプットレイアウトの設定
+        pD3D11DeviceContext->IASetInputLayout(VSPDirect::GetPtr()->GetInputLayout());
+
+        //描画
+        pD3D11DeviceContext->Draw(m_NumVertices, 0);
+        //後始末
+        //ステータスのポインタ
+        auto RenderStatePtr = GetStage()->GetRenderState();
+        Dev->InitializeStates(RenderStatePtr);
+    }
+</pre>
+</div>
+　たかだか三角形を一つ描画するために、ずいぶんコードを書かなければならないのだな、と思うでしょう。<br />
+　そうなのです。<b>DirectX11</b>は多機能なため、それぞれの機能を一つ一つ設定しないと、そのオブジェクトが必要とする描画を実装できないのです、それでも、フレームワーク内蔵のシェーダを使用しているだけ、まだシンプルです。<br />
+<br />
+　一つ一つ見ていきましょう。まず、描画するためのインターフェイスである、<b>ID3D11DeviceContext2インターフェイス</b>を取得します。これは、起動時に作成されていて、以下の2行で取得できます。
+<div class="box1">
+<pre>
+        auto Dev = App::GetApp()->GetDeviceResources();
+        auto pD3D11DeviceContext = Dev->GetD3DDeviceContext();
+</pre>
+</div>
+　続いて、<b>コンスタントバッファ</b>と呼ばれる、<b>シェーダに渡すパラメータ</b>を設定します。<br />
+　今回利用するシェーダーは頂点シェーダは<b>VSPDirectクラス</b>、ピクセルシェーダは<b>PSPDirectクラス</b>というクラスに入っています。それぞれ<b>シングルトン</b>になっていて、スタティック関数を使ってシェーダそのものを取得します。<br />
+　シェーダークラスは、シェーダーそのもの（Shadersディレクトリにある、.hlsl拡張子のファイル）をラッピングしたクラスです。独自のシェーダを作った場合は、ラッピングクラスとして類似の新しいクラスを作成します。こうしておくと<b>シェーダの使いまわし（同じシェーダはいくつも作る必要がない）</b>できます。<b>シングルトン</b>になっているのはそのため（使いまわしができるように）です。<br />
+　<b>コンスタントバッファ</b>はそれらのシェーダに渡すパラメータを記述します。<br />
+　まず、<b>VSPDirectクラス</b>が持つ<b>頂点シェーダ</b>を紹介します。<br />
+　<b>BaseLib/Shadersフィルタ</b>にある<b>VSPDirect.hlsl</b>というファイルが頂点シェーダ本体です。
+<div class="box1">
+<pre>
+#include "INCStructs.hlsli"
+
+cbuffer ConstantBuffer : register(b0)
+{
+    float4 Diffuse : packoffset(c0);
+};
+
+PSPCInput main(float4 position : SV_POSITION)
+{
+    PSPCInput result;
+
+    result.position = position;
+    result.color = Diffuse;
+
+    return result;
+}
+</pre>
+</div>
+　まず、冒頭にインクルードされている
+<div class="box1">
+<pre>
+#include "INCStructs.hlsli"
+</pre>
+</div>
+　は頂点データやピクセルシェーダに渡す構造体が宣言されています。シェーダと同じディレクトリにある<b>INCStructs.hlsli</b>を見てみると内容がわかります。<b>main()関数</b>がエントリポイントです。<b>DxBase2016</b>では、すべてのシェーダが<b>main()関数</b>がエントリポイントになっています。<br />
+　この頂点シェーダは、ポジション入力して、<b>PSPCInput型のオブジェクト</b>を出力します。<b>PSPCInput型</b>の構造体は以下の通りです。<b>INCStructs.hlsli</b>に含まれます。<br />
+<div class="box1">
+<pre>
+struct PSPCInput
+{
+    float4 position : SV_POSITION;
+    float4 color : COLOR;
+};
+</pre>
+</div>
+　<b>main()関数</b>では、この構造体のインスタンスを定義して、中身を設定します。今回は、ジオメトリシェーダは使用しないので、<b>頂点シェーダの出力は、そのままピクセルシェーダの入力</b>になります。<br />
+　内容の設定は、頂点の位置と色情報です。色情報はコンスタントバッファによってわたされます（<b>Diffuse</b>）。<br />
+　通常３Ｄ用のシェーダであれば、ここで、ワールド変換、ビュー変換、射影変換を行いますが、このサンプルは<b>デバイス座標に直接描画する</b>ので計算は必要ないのです。<br />
+　ここで、コンスタントバッファである<b>ConstantBuffer</b>構造体に注目しましょう。この構造体こそが、C++プログラムから渡される<b>シェーダで使用するパラメータ</b>です。<b>OnDraw()関数</b>内の<b>PDirectConstantBuffer sb</b>にほかなりません。<br />
+<br />
+　続いて<b>ピクセルシェーダ</b>です。<b>BaseLib/Shadersフィルタ</b>にある<b>PSPDirect.hlsl</b>というファイルが<b>ピクセルシェーダ本体</b>です。
+<div class="box1">
+<pre>
+#include "INCStructs.hlsli"
+
+
+float4 main(PSPCInput input) : SV_TARGET
+{
+    return input.color;
+}
+</pre>
+</div>
+　こちらは至ってシンプルです。ピクセルシェーダも<b>main()</b>という関数ですが、頂点シェーダからの入力<b>PSPCInput input</b>構造体が渡されますが、頂点位置情報を全く無視して、<b>input.color</b>という構造体内の<b>色情報</b>をそのまま出力しています。（returnするということは出力する、という意味です）<br />
+　<b>ピクセルシェーダの出力</b>は、そのままディスプレイ上の<b>色</b>になると前述しました。つまり、どんな入力があろうがすべて、<b>input.colorを描画する</b>というのがこのピクセルシェーダが行っている処理です。<br />
+
+<br />
+　それではシェーダ側の説明はこれくらいにして、OnDraw()に戻ります。<br />
+　OnDraw()関数内の、以下の記述は、シェーダ（今回は頂点シェーダのみ）に渡すパラメータを準備しています。
+<div class="box1">
+<pre>
+        //コンスタントバッファの準備
+        PDirectConstantBuffer sb;
+        sb.Diffuse = Color4(1.0f, 1.0f, 0, 1.0f);
+</pre>
+</div>
+　<b>PDirectConstantBuffer</b>は構造体で、実体は以下のような形になっています。
+<div class="box1">
+<pre>
+    struct PDirectConstantBuffer
+    {
+        Color4 Diffuse;
+        PDirectConstantBuffer() {
+            memset(this, 0, sizeof(PDirectConstantBuffer));
+        };
+    };
+</pre>
+</div>
+　ここではコンストラクタのみ用意され、０初期化しています。<br />
+　<b>OnDraw()</b>では、<b>Diffuse</b>メンバに<b>Color4(1.0f, 1.0f, 0, 1.0f)</b>を渡しています。すなわち<b>黄色</b>ですね。<br />
+　そのあと
+<div class="box1">
+<pre>
+        //コンスタントバッファの更新
+        pD3D11DeviceContext->UpdateSubresource(
+            CBPDirect::GetPtr()->GetBuffer(), 0, nullptr, &sb, 0, 0);
+</pre>
+</div>
+　の記述で、CBPDirectクラスのバッファへ、構造体sbからデータを移行させます。<br />
+　続いて
+<div class="box1">
+<pre>
+        //ストライドとオフセット
+        UINT stride = sizeof(VertexPosition);
+        UINT offset = 0;
+        pD3D11DeviceContext->IASetVertexBuffers(0, 1, 
+            m_VertexBuffer.GetAddressOf(), &stride, &offset);
+        //描画方法（3角形）
+        pD3D11DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+</pre>
+</div>
+　で、頂点バッファを渡し、描画方法を設定します。<b>strideとoffset</b>は頂点バッファの構造です。<b>stride</b>は各頂点のサイズ（つまり位置情報のみの頂点だということ）、<b>offset</b>はどの位置から描画するかを設定します。<br />
+<br />
+　続いてシェーダの設定です。
+<div class="box1">
+<pre>
+        //コンスタントバッファの設定
+        ID3D11Buffer* pConstantBuffer = CBPDirect::GetPtr()->GetBuffer();
+        ID3D11Buffer* pNullConstantBuffer = nullptr;
+        //頂点シェーダに渡す
+        pD3D11DeviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+        //ピクセルシェーダには渡さない（nullptrを渡す）
+        pD3D11DeviceContext->PSSetConstantBuffers(0, 1, &pNullConstantBuffer);
+        //シェーダの設定
+        pD3D11DeviceContext->VSSetShader(VSPDirect::GetPtr()->GetShader(), nullptr, 0);
+        pD3D11DeviceContext->PSSetShader(PSPDirect::GetPtr()->GetShader(), nullptr, 0);
+        //インプットレイアウトの設定
+        pD3D11DeviceContext->IASetInputLayout(VSPDirect::GetPtr()->GetInputLayout());
+</pre>
+</div>
+　ここではコンスタントバッファを頂点シェーダに渡し、頂点シェーダ及びピクセルシェーダを設定します。最後に<b>インプットレイアウト</b>というのを設定します。これは頂点シェーダの引数のレイアウトイメージです。頂点シェーダクラス（VSPDirect）が作成されたときに設定されますので、それを渡します。<br />
+<br />
+　そしていよいよ描画です。
+<div class="box1">
+<pre>
+        //描画
+        pD3D11DeviceContext->Draw(m_NumVertices, 0);
+</pre>
+</div>
+　ここでは、頂点の数（３）を渡しています。<br />
+　最後にほかのオブジェクトの描画の邪魔にならないように、後始末をします。
+<div class="box1">
+<pre>
+        //後始末
+        //ステータスのポインタ
+        auto RenderStatePtr = GetStage()->GetRenderState();
+        Dev->InitializeStates(RenderStatePtr);
+</pre>
+</div>
+<br />
+　こうして一つ一つ見ていきますと、決して無駄な設定は行っていないのがわかります。つまり描画処理というのは<b>グラフィックパイプラインの準備と実行</b>と考えられます。<br />
+<br />
+　オブジェクトによってさまざまな描画方法が求められます。３Ｄオブジェクトであれば、遠近法などの処理も必要ですし、影を映りこませるには、ステンシルバッファの設定も必要です。スプライトやエフェクトであればＺバッファを有効にするのか、無効にするのかなどの設定も必要です。<br />
+　<b>DxBase2016</b>では、ゲームによって変わるさまざまな表現を実装するために、このように、フレームワークを通して描画する以外に、DirectX11への直接のアプローチをできるようになってます。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="index.html">目次</a></li>
+<li><a href="40_02.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

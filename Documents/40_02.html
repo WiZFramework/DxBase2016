@@ -1,0 +1,497 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>４．独自の頂点と独自描画</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>４０２．頂点シェーダとピクセルシェーダの自作１</h3>
+　この項と次項で、代表的なシェーダである、<b>頂点シェーダとピクセルシェーダ</b>について説明します。<br />
+　ただ、具体的には<b>DxBase2016で使用する場合</b>の説明ですので、シェーダの文法を詳しく知りたい場合は関連書籍やネットでの解説を、あるいは他エンジンでシェーダを自作する場合はそのエンジンの解説を参照ください。ここで説明するのはあくまで<b>DxBase2016で使用する場合</b>です。<br />
+<br />
+<h4>シェーダーとプロジェクトの関係</h4>
+　シェーダーは、<b>DxBase2016</b>では<b>HLSL5.0</b>で記述します。インターネットで調べてもらうとわかると思いますが、<b>HLSL</b>というのは、シェーダー記述用の言語で<b>C言語に似た</b>文法で記述します。その<b>バージョン5.0</b>という意味です。<br />
+　また<b>DxBase2016</b>では、シェーダのコンパイルを<b>VisualStdio2013</b>に任せます。つまり、C++のビルド時に一緒にビルドします。これは、これまでもリビルド等のときの出力に、シェーダーのビルドをしているらしい出力があったと思いますが、まさにそうです。<br />
+　シェーダーはコンパイルすると<b>.cso</b>のいう拡張子のファイルになります。これはバイナリファイルです。この<b>.csoファイル</b>は<b>media/Shadersディレクトリ</b>に、ビルド時に保存されるように設定します。ライブラリで使用するシェーダもあらかじめそのように設定されています。<br />
+　ですので独自のシェーダも同じディレクトリに保存するように作成します。<br />
+<br/>
+<h4>頂点シェーダーとピクセルシェーダファイルの作成</h4>
+　頂点シェーダーを作成するにはまず、以下のように<b>DxBase2016/シェーダファイル</b>という<b>フィルタ</b>に<b>新しい項目</b>で追加します。
+<p>&nbsp;</p>
+<img src="img/4002a.jpg" width="80%"/>
+<p>図4002a</p>
+<p>&nbsp;</p>
+　そのあと、以下のように<b>HSLS、頂点シェーダ</b>を選択してファイル名を設定します。ここではファイル名を、たとえば<b>VSMyShader.hsls</b>、保存するディレクトリを<b>DxBase2016\Shaders\</b>に設定します。（Shadersディレクトリは別途作成します）。<b>DxBase2016直下</b>でも問題はありませんが、C++ファイルとシェーダファイルを分けた方がいいと思います。<br />
+<p>&nbsp;</p>
+<img src="img/4002b.jpg" width="80%"/>
+<p>図4002b</p>
+<p>&nbsp;</p>
+　作成すると、mainという関数が自動的にできています。<b>VSMyShader.hlsl</b>の<b>プロパティ</b>を確認して、ちゃんと<b>media/Shadersディレクトリ</b>にcsoファイルがビルドされるようになってるか確認します。<br />
+　以下のようなプロパティシートになってれば問題ありません。<b>DebugとRelease両方（すべての構成、でもよい）</b>を確認します。
+<p>&nbsp;</p>
+<img src="img/4002c.jpg" width="80%"/>
+<p>図4002c</p>
+<p>&nbsp;</p>
+　注意点は<b>出力ファイルのオブジェクトファイル名</b>が<b>$(SolutionDir)media\Shaders\%(Filename).cso</b>になっているかどうか、です。<br />
+　ここまで設定したら、一度<b>リビルド</b>をかけてみます。リビルド後、ライブラリのシェーダ類と一緒に<b>media/Shadersディレクトリ内</b>に<b>VSMyShader.cso</b>ができていれば設定終了です。あとは、シェーダを記述するだけです。<br />
+<br />
+　<b>ピクセルシェーダ</b>も同様の方法です。作成するシェーダを<b>ピクセルシェーダ</b>にして、ファイル名を<b>PSMyShader.hsls</b>などにします。<br/>
+　やはり<b>出力ファイルのオブジェクトファイル名</b>が<b>$(SolutionDir)media\Shaders\%(Filename).cso</b>になっているかどうかを確認します。<br />
+<br />
+　<b>頂点シェーダとピクセルシェーダ</b>のファイル名を、頂点の場合は<b>VS</b>ピクセルは<b>PS</b>にするのは、わかりやすくするためで、自分が判別できれば別名でも構いません。ようは、プロジェクト内でライブラリのシェーダなどと混同しなければよいと思います。また、ライブラリ内シェーダと同名のシェーダを作成すると当然ですが正常に動きませんので注意しましょう。<br/>
+<br />
+　また、これ以外のシェーダも同様の方法で作成します。複数のシェーダから利用する<b>ヘッダファイル（拡張子.hlsli）</b>も作成できます。共通で使用するコンスタントバッファや頂点定義の構造体など、ヘッダファイルにまとめて記述するとバグも少なくなります。<br />
+<br />
+<h4>サンプル説明</h4>
+　<b>Sample402</b>は自作の頂点シェーダとピクセルシェーダを使って３Ｄオブジェクトの描画を実装したものです。<br />
+　<b>Sample402ディレクトリ</b>のソリューションを開き、リビルド、そして実行すると以下のような画面が現れます。
+<p>&nbsp;</p>
+<img src="img/4002d.jpg" width="80%"/>
+<p>図4002d</p>
+<p>&nbsp;</p>
+　この奥の方で回転するボックスが、今回独自のシェーダで描画しているオブジェクトです。<br />
+　<b>独自の描画</b>といっても、ライブラリに内蔵されてるシェーダを少し単純にしたもので、特別な処理を行っているわけではありません。<br />
+　この項では、いわゆる<b>ライティングとテクスチャを施した</b>基本的なシェーダを説明します。より特徴的なものは、次項以降で説明します。<br />
+<br/>
+　ここで作成したシェーダは<b>VSSimpleBase.hlsl（頂点シェーダ）</b>と<b>PSSimpleBase.hlsl（ピクセルシェーダ）</b>です。共通のヘッダとして、<b>SimpleInc.hlsli</b>も作成しています。<br />
+　すべて、<b>シェーダファイル</b>というフィルタ内に入ってます。実体は<b>DxBase2015Desktop/Shaders</b>にあります。<br />
+<br />
+<h4>ヘッダファイル</h4>
+　まず、ヘッダファイル<b>SimpleInc.hlsli</b>から見ていきましょう。ここでは、両シェーダから参照するコンスタントバッファと、シェーダに渡される構造体が定義されています。
+<div class="box1">
+<pre>
+cbuffer SimpleConstantBuffer : register(b0)
+{
+    float4x4 World  : packoffset(c0);
+    float4x4 View   : packoffset(c4);
+    float4x4 Projection : packoffset(c8);
+    float4 LightDir : packoffset(c12);
+    float4 Param : packoffset(c13);
+};
+
+struct VertexShaderInput
+{
+    float4 pos : SV_Position;
+    float3 norm : NORMAL;
+    float2 tex : TEXCOORD0;
+};
+
+struct PixelShaderInput
+{
+    float4 pos : SV_POSITION;
+    float3 norm : NORMAL;
+    float2 tex : TEXCOORD0;
+};
+</pre>
+</div>
+　最初に定義されている、<b>cbuffer SimpleConstantBuffer</b>はコンスタントバッファです。C++からシェーダへのパラメータの受け渡しに使います。<br />
+<div class="box1">
+<pre>
+cbuffer SimpleConstantBuffer : <spab class="red">register(b0)</span>
+{
+</pre>
+</div>
+　の<b>register(b0)</b>は定数バッファをあらわします。コンスタントバッファは定数バッファです。<br />
+　コンスタントバッファ内の<b>packoffset(c0)</b>などは、<b>パッキング番号</b>を記述します。シェーダは、C言語に似ているといっても、アセンブラに近い世界ですので、メモリ上のデータの位置、境界などが重要になります。<b>packoffset(c4)</b>は、パッキングの４番目という意味です。１つのパッキングは16バイトでアラインメントされます。16バイトはfloat型4つ分です。<br />
+　上記の例ですと、<b>float4x4 World</b>は<b>float型16個（パッキング4個）</b>使いますので、次の変数<b>float4x4 View</b>のパッキングは、4番目から始まります。ですから、
+<div class="box1">
+<pre>
+cbuffer SimpleConstantBuffer : register(b0)
+{
+    float4x4 World  : <span class="red">packoffset(c0);</span>
+    float4x4 View   : <span class="red">packoffset(c4);</span>
+//中略
+};
+</pre>
+</div>
+　のようになるわけです。<br/>
+　続く
+<div class="box1">
+<pre>
+struct VertexShaderInput
+{
+    float4 pos : SV_Position;
+    float3 norm : NORMAL;
+    float2 tex : TEXCOORD0;
+};
+</pre>
+</div>
+　は<b>頂点シェーダの入力構造体</b>です。今回作成するボックスの頂点フォーマットは、<b>位置、法線、テクスチャUV</b>を持っています。ですからそれを記述します。<br />
+<div class="box1">
+<pre>
+    float4 pos : <span class="red">SV_Position;</span>
+</pre>
+</div>
+　などの<b>SV_Position</b>は、<b>セマンティクス</b>と言って、そのデータが<b>何に使用されるか</b>を記述します。<b>SV_Position</b>は<b>システム値位置情報</b>という意味です。<br/>
+　また、<b>NORMALは法線</b>、<b>TEXCOORD0は0番目のテクスチャUV値</b>という意味です。<br />
+<br />
+<h4>頂点シェーダ</h4>
+　それでは、<b>VSSimpleBase.hlsl（頂点シェーダ）</b>を見ていきましょう。以下のような内容です。
+<div class="box1">
+<pre>
+#include "SimpleInc.hlsli"
+
+PixelShaderInput main(VertexShaderInput input)
+{
+    //ピクセルシェーダーに渡す変数
+    PixelShaderInput vertexShaderOutput;
+    //頂点の位置を変換
+    float4 pos = float4(input.pos.xyz, 1.0f);
+    //ワールド変換
+    pos = mul(pos, World);
+    //ビュー変換
+    pos = mul(pos, View);
+    //射影変換
+    pos = mul(pos, Projection);
+    //ピクセルシェーダに渡す変数に設定
+    vertexShaderOutput.pos = pos;
+    //テクスチャのUV値を設定
+    vertexShaderOutput.tex = input.tex;
+    //ライティング用に法線をワールド変換して設定
+    vertexShaderOutput.norm = mul(input.norm, (float3x3)World);
+    //ピクセルシェーダに出力
+    //returnはピクセルシェーダに渡すことを意味する
+    return vertexShaderOutput;
+}
+</pre>
+</div>
+　まず、<b>#include "SimpleInc.hlsli"</b>でヘッダファイルをインクルードしておきます。<br />
+　今回の例では、<b>頂点シェーダの出力は、そのままピクセルシェーダの入力</b>になると考えて差し支えありません。<br />
+　ですから最初に、ピクセルシェーダの入力構造体の変数<b>vertexShaderOutput</b>を定義します。<br />
+　この構造体の中にデータをセットしてリターンすればよいことになります。<br />
+　<b>PixelShaderInput構造体</b>には、ヘッダのところで説明したように、
+<div class="box1">
+<pre>
+struct PixelShaderInput
+{
+    float4 pos : SV_POSITION;
+    float3 norm : NORMAL;
+    float2 tex : TEXCOORD0;
+};
+</pre>
+</div>
+　のメンバがあります。まず<b>pos</b>ですが、頂点シェーダに渡される<b>input.pos</b>はローカル座標です。今回のオブジェクトの場合、原点を中心とした1辺が1.0の立方体の頂点です。<br />
+　ですので、それを、<b>ワールド変換、ビュー変換、射影変換</b>の3つの変換を施して、デバイス座標に変換しなければなりません。それを<b>頂点シェーダ</b>で行います。<br />
+　難しいことはありません、コンスタントバッファには、各変換の行列がC++から渡されています。これを利用して、掛け算を行っていきます。それが以下の部分です。
+<div class="box1">
+<pre>
+    //頂点の位置を変換
+    float4 pos = float4(input.pos.xyz, 1.0f);
+    //ワールド変換
+    pos = mul(pos, World);
+    //ビュー変換
+    pos = mul(pos, View);
+    //射影変換
+    pos = mul(pos, Projection);
+</pre>
+</div>
+　こうすると、posには、デバイス座標上の位置がセットされますので、それを、ピクセルシェーダ向けの構造体にセットします。
+<div class="box1">
+<pre>
+    //ピクセルシェーダに渡す変数に設定
+    vertexShaderOutput.pos = pos;
+</pre>
+</div>
+　続いてテクスチャのUV値は、頂点シェーダに渡された値をそのままセットします。
+<div class="box1">
+<pre>
+    //テクスチャのUV値を設定
+    vertexShaderOutput.tex = input.tex;
+</pre>
+</div>
+　最後に法線ですが、各頂点の法線はライティングに使用されます。頂点シェーダに渡される法線は、ローカル上の法線ですので、これを、ワールド上の法線に変換します。
+<div class="box1">
+<pre>
+    //ライティング用に法線をワールド変換して設定
+    vertexShaderOutput.norm = mul(input.norm, (float3x3)World);
+</pre>
+</div>
+　ここではワールド行列を3x3の行列にキャストしたもので掛け算をしています。<br />
+　あとはリターンするだけです。
+<div class="box1">
+<pre>
+    //ピクセルシェーダに出力
+    //returnはピクセルシェーダに渡すことを意味する
+    return vertexShaderOutput;
+</pre>
+</div>
+<br />
+<br />
+<h4>ピクセルシェーダ</h4>
+　<b>ピクセルシェーダ</b>は以下のような内容です。
+<div class="box1">
+<pre>
+#include "SimpleInc.hlsli"
+
+Texture2D SimpleTexture : register(t0);
+SamplerState SimpleSampler : register(s0);
+
+
+float4 main(PixelShaderInput input) : SV_TARGET
+{
+    //ライトの向きを得る
+    float3 LightDirection = -normalize(float3(LightDir.xyz));
+    float3 InputNormal = normalize(input.norm);
+    //ライトによるピクセルの色を決定
+    float4 LightColor = saturate(dot(InputNormal, LightDirection) 
+        + float4(0.7, 0.7, 0.7, 1.0));
+    //ライトの透明処理はなし
+    LightColor.a = 1;
+    //テクスチャによるピクセルの色を決定
+    float4 TexCol = SimpleTexture.Sample(SimpleSampler, input.tex);
+    //テクスチャ色とライト色を合成
+    return TexCol * LightColor;
+}
+</pre>
+</div>
+　頂点シェーダと同じように、最初にヘッダをインクルードしています。<br />
+　続いて
+<div class="box1">
+<pre>
+Texture2D SimpleTexture : register(t0);
+SamplerState SimpleSampler : register(s0);
+</pre>
+</div>
+　はテクスチャのリソースとそのテクスチャをサンプリングするためのサンプラーステートです。これらはC++側によって設定されます。<br />
+　main()関数内、最初に、ライトによる色（明度）の決定を行います。<br />
+　その計算は以下の部分です。
+<div class="box1">
+<pre>
+    //ライトの向きを得る
+    float3 LightDirection = -normalize(float3(LightDir.xyz));
+    float3 InputNormal = normalize(input.norm);
+    //ライトによるピクセルの色を決定
+    float4 LightColor = saturate(dot(InputNormal, LightDirection) 
+        + float4(0.7, 0.7, 0.7, 1.0));
+    //ライトの透明処理はなし
+    LightColor.a = 1;
+</pre>
+</div>
+　ここで、いったい何の計算をしてるのか、と、戸惑うかもしれませんが、分析するとよくわかります。<br />
+　まず、ライトの逆向きを得ます。続いて正規化された法線を得ます。<br />
+　続いての計算は、以下の図を見てください。
+<p>&nbsp;</p>
+<img src="img/4002e.jpg" width="80%"/>
+<p>図4002e</p>
+<p>&nbsp;</p>
+　ライトの逆向きと面の法線を内積をとっていますが、これは、上図の<b>内積の値</b>を計算することです。つまり、面の法制に対して、ライトの角度が大きければ、内積の値は小さくなります。<br />
+　その内積の結果に、ライト色（0.7, 0.7, 0.7, 1.0）を足し、それを、0.0から1.0の間にクランプ（saturate関数）すると、ライトによる色（ここでは白色なので、明度、ということになる）がでます。<br />
+　テクスチャの方の計算は、C++から渡された、サンプラーとテクスチャリソースを組み合わせて計算します。
+<div class="box1">
+<pre>
+    //テクスチャによるピクセルの色を決定
+    float4 TexCol = SimpleTexture.Sample(SimpleSampler, input.tex);
+</pre>
+</div>
+　最後に、ライトによる色とテクスチャによる色を掛け合わせて出力します。
+<div class="box1">
+<pre>
+    //テクスチャ色とライト色を合成
+    return TexCol * LightColor;
+</pre>
+</div>
+<br />
+<h4>C++側の記述</h4>
+　これまで、シェーダの作成方法を説明してきました。<br />
+　ここから、これらのシェーダを呼び出す側の記述です。配置されている<b>CustomDrawBoxクラス</b>は<b>Charactor.h、cpp</b>にあります。<br />
+　まず、<b>Charactor.h_</b>です。
+<div class="box1">
+<pre>
+    class CustomDrawBox : public GameObject{
+        //中略
+        //コンスタントバッファ構造体
+        struct ConstantBuffer
+        {
+            Matrix4X4 World;
+            Matrix4X4 View;
+            Matrix4X4 Projection;
+            Vector4 LightDir;
+            Vector4 Param;  //汎用パラメータ
+
+        };
+        //コンスタントバッファ
+        shared_ptr&lt;CBuffer&lt;ConstantBuffer>> m_ConstantBuffer;
+        //頂点シェーダ
+        shared_ptr&lt;VShader&lt;VertexPositionNormalTexture>> m_VirtexShader;
+        //ピクセルシェーダー
+        shared_ptr&lt;PShader> m_PixelShader;
+    public:
+        //中略
+
+        //初期化
+        virtual void OnCreate() override;
+        virtual void OnUpdate() override;
+        virtual void OnDraw() override;
+    };
+</pre>
+</div>
+　シェーダ操作に関係ない部分は省略してあります。<br />
+　ここでは、<b>コンスタントバッファ構造体宣言、コンスタントバッファ、頂点シェーダ、ピクセルシェーダ</b>がそれぞれ宣言されています。<br />
+　これらの初期化は、<b>Create()関数</b>で行います。<br/>
+<div class="box1">
+<pre>
+    void CustomDrawBox::OnCreate(){
+
+        //中略
+
+        <span class="red">//シェーダの作成
+        //コンスタントバッファ
+        m_ConstantBuffer = make_shared&lt;CBuffer&lt;ConstantBuffer>>();
+        //頂点シェーダ
+        m_VirtexShader = make_shared&lt;VShader&lt;VertexPositionNormalTexture>>(
+            App::GetApp()->m_wstrRelativeShadersPath + L"VSSimpleBase.cso"
+        );
+        //ピクセルシェーダー
+        m_PixelShader = make_shared&lt;PShader>(
+            App::GetApp()->m_wstrRelativeShadersPath + L"PSSimpleBase.cso"
+        );</span>
+        //影をつける（シャドウマップを描画する）
+        auto ShadowPtr = AddComponent&lt;Shadowmap>();
+        //影の形（メッシュ）を設定
+        ShadowPtr->SetMeshResource(L"DEFAULT_CUBE");
+        //透明処理（描画順制御のため）
+        SetAlphaActive(true);
+    }
+</pre>
+</div>
+　ここでは、<b>コンスタントバッファ、頂点シェーダ、ピクセルシェーダ</b>を作成します。<br />
+　<b>コンスタントバッファ</b>は<b>CBufferテンプレートクラス</b>を使って作成します。テンプレートパラメータに、ConstantBuffer構造体を渡します。<br />
+　<b>頂点シェーダ</b>は、<b>頂点の型と、シェーダのコンパイル済みバイナリファイル（.cso）</b>を渡します。<b>VShaderテンプレートクラス</b>を使います。<br />
+　<b>ピクセルシェーダ</b>は、<b>シェーダのコンパイル済みバイナリファイル（.cso）</b>を渡します。<b>PShaderテンプレートクラス</b>を使います。<br />
+　このように初期化すると、Draw()できるようになります。<br />
+　以下は<b>OnDraw()関数</b>です。
+<div class="box1">
+<pre>
+    void CustomDrawBox::OnDraw(){
+        //デバイスの取得
+        auto Dev = App::GetApp()->GetDeviceResources();
+        auto pDx11Device = Dev->GetD3DDevice();
+        auto pID3D11DeviceContext = Dev->GetD3DDeviceContext();
+        //ステータスのポインタ
+        auto RenderStatePtr = GetStage()->GetRenderState();
+
+        auto PtrT = GetComponent&lt;Transform>();
+        //ステージからカメラを取り出す
+        auto PtrCamera = GetStage()->GetTargetCamera();
+        //カメラの取得
+        Matrix4X4 View, Proj, WorldViewProj;
+        View = PtrCamera->GetViewMatrix();
+        Proj = PtrCamera->GetProjMatrix();
+
+        //コンスタントバッファの設定
+        ConstantBuffer cb1;
+        ZeroMemory(&cb1, sizeof(cb1));
+        //行列の設定(転置する)
+        cb1.World = Matrix4X4EX::Transpose(PtrT->GetWorldMatrix());;
+        cb1.View = Matrix4X4EX::Transpose(View);
+        cb1.Projection = Matrix4X4EX::Transpose(Proj);
+        //ライトの設定
+        //ステージから0番目のライトを取り出す
+        auto PtrLight = GetStage()->GetTargetLight(0);
+        cb1.LightDir = PtrLight->GetDirectional();
+        cb1.LightDir.w = 1.0f;
+
+        //コンスタントバッファの更新
+        pID3D11DeviceContext->UpdateSubresource(
+            m_ConstantBuffer->GetBuffer(), 0, nullptr, &cb1, 0, 0);
+        //ストライドとオフセット
+        UINT stride = sizeof(VertexPositionNormalTexture);
+        UINT offset = 0;
+        //頂点バッファの設定
+        auto PtrMeshResource = App::GetApp()->GetResource&lt;MeshResource>(L"DEFAULT_CUBE");
+        pID3D11DeviceContext->IASetVertexBuffers(
+            0, 1, PtrMeshResource->GetVertexBuffer().GetAddressOf(), &stride, &offset);
+        //インデックスバッファのセット
+        pID3D11DeviceContext->IASetIndexBuffer(
+            PtrMeshResource->GetIndexBuffer().Get(), DXGI_FORMAT_R16_UINT, 0);
+        //描画方法（3角形）
+        pID3D11DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        //ステータスのポインタ
+        //テクスチャを取得
+        ID3D11ShaderResourceView* pNull[1] = { 0 };
+        ID3D11SamplerState* pNullSR[1] = { 0 };
+        //テクスチャを設定
+        auto PtrTextureResource = App::GetApp()->GetResource&lt;TextureResource>(L"TRACE_TX");
+        pID3D11DeviceContext->PSSetShaderResources(
+            0, 1, PtrTextureResource->GetShaderResourceView().GetAddressOf());
+        //リニアサンプラーを設定
+        ID3D11SamplerState* samplerState = RenderStatePtr->GetLinearClamp();
+        pID3D11DeviceContext->PSSetSamplers(0, 1, &samplerState);
+        //半透明処理
+        pID3D11DeviceContext->OMSetBlendState(
+            RenderStatePtr->GetAlphaBlendEx(), nullptr, 0xffffffff);
+
+        //デプスステンシルは使用する
+        pID3D11DeviceContext->OMSetDepthStencilState(RenderStatePtr->GetDepthDefault(), 0);
+        //シェーダの設定
+        pID3D11DeviceContext->VSSetShader(m_VirtexShader->GetShader(), nullptr, 0);
+        pID3D11DeviceContext->PSSetShader(m_PixelShader->GetShader(), nullptr, 0);
+        //インプットレイアウトの設定
+        pID3D11DeviceContext->IASetInputLayout(m_VirtexShader->GetInputLayout());
+        //コンスタントバッファの設定
+        ID3D11Buffer* pConstantBuffer = m_ConstantBuffer->GetBuffer();
+        pID3D11DeviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+        pID3D11DeviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
+
+        //レンダリングステート
+        pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullFront());
+        //描画
+        pID3D11DeviceContext->DrawIndexed(PtrMeshResource->GetNumIndicis(), 0, 0);
+        //レンダリングステート
+        pID3D11DeviceContext->RSSetState(RenderStatePtr->GetCullBack());
+        //描画
+        pID3D11DeviceContext->DrawIndexed(PtrMeshResource->GetNumIndicis(), 0, 0);
+        //後始末
+        Dev->InitializeStates(RenderStatePtr);
+
+    }
+</pre>
+</div>
+　<b>OnDraw()で行わなければならないこと</b>を、以下にざっと説明します。もっと細かい設定が必要な場合もあります。
+<div class="box1">
+<pre>
+＊コンスタントバッファに、ワールド行列、ビュー行列、射影行列を渡す。
+＊コンスタントバッファにライト方向を渡す。
+＊コンスタントバッファの更新
+＊コンスタントバッファの設定
+＊頂点シェーダの設定
+＊ピクセルシェーダの設定
+＊頂点バッファの設定
+＊描画方法（3角形）の設定
+＊インデックスバッファの設定
+＊テクスチャの設定
+＊サンプラーステートの設定
+＊ブレンドステートの設定
+＊デプスステンシルステートの設定
+＊レンダリングステートの設定
+＊描画命令
+＊後始末
+</pre>
+</div>
+　それぞれ、OnDraw()関数内のコメントを確認してください。また、描画を2回行っているとことに注意しましょう。透明なオブジェクトは、内側を描画し、そのあと外側を描画することで、<b>内側の壁が覗ける</b>形で描画できます。<br />
+　<b>ワールド行列、ビュー行列、射影行列</b>は<b>転置して（Matrix4X4EX::Transpose()関数を通して）</b>渡します。HSLSシェーダはデフォルトで列優先（col_major）です。C++側が行優先（row_major）なので調整します。
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="40_01.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+<li><a href="40_03.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>
