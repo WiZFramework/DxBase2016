@@ -1583,7 +1583,8 @@ namespace basedx11{
 				}
 			}
 		}
-		ResetHitObject();
+		//ResetHitObjectはOnLastUpdate後の処理へ移動
+		//ResetHitObject();
 		if (PtrSrcGravity){
 			if (PtrSrcGravity->GetOnObject()){
 				EscapeFromDestParent(PtrSrcGravity->GetOnObject());
@@ -1716,8 +1717,13 @@ namespace basedx11{
 			SetHitTime(HitTime);
 			SetHitObject(DestObj);
 		}
-
-
+		//Capsuleが回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec;
+		if (HitTest::SPHERE_CAPSULE(SrcSphere, DestCapsule, RetVec)){
+			SetHitTime(0);
+			SetHitObject(DestObj);
+		}
 	}
 
 
@@ -1734,6 +1740,7 @@ namespace basedx11{
 		OBB DestObb = DestCollisionObbPtr->GetObb();
 		OBB DestBeforeObb = DestCollisionObbPtr->GetBeforeObb();
 		Vector3 DestVelocity = DestObb.m_Center - DestBeforeObb.m_Center;
+
 		Vector3 SpanVelocity = SrcVelocity - DestVelocity;
 		SpanVelocity /= ElapsedTime;
 		float HitTime = 0;
@@ -1744,6 +1751,13 @@ namespace basedx11{
 			//続いて残りも判定するが、最終的に、一番Before地点に近いオブジェクトが
 			//設定される
 			SetHitTime(HitTime);
+			SetHitObject(DestObj);
+		}
+		//OBBが回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec;
+		if (HitTest::SPHERE_OBB(SrcSphere, DestObb, RetVec)){
+			SetHitTime(0);
 			SetHitObject(DestObj);
 		}
 	}
@@ -1974,8 +1988,13 @@ namespace basedx11{
 			SetHitTime(HitTime);
 			SetHitObject(DestObj);
 		}
-
-
+		//Capsuleが回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec;
+		if (HitTest::SPHERE_CAPSULE(DestSphere, SrcCapsule, RetVec)){
+			SetHitTime(0);
+			SetHitObject(DestObj);
+		}
 	}
 	void CollisionCapsule::CollisionWithCapsule(const shared_ptr<GameObject>& DestObj){
 
@@ -2004,8 +2023,13 @@ namespace basedx11{
 			SetHitTime(HitTime);
 			SetHitObject(DestObj);
 		}
-
-
+		//Capsuleが回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec1, RetVec2;
+		if (HitTest::CAPSULE_CAPSULE(SrcCapsule, DestCapsule, RetVec1, RetVec2)){
+			SetHitTime(0);
+			SetHitObject(DestObj);
+		}
 	}
 	void CollisionCapsule::CollisionWithObb(const shared_ptr<GameObject>& DestObj){
 		auto DestCollisionObbPtr = DestObj->GetComponent<CollisionObb>();
@@ -2034,7 +2058,13 @@ namespace basedx11{
 			SetHitTime(HitTime);
 			SetHitObject(DestObj);
 		}
-
+		//回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec;
+		if (HitTest::CAPSULE_OBB(SrcCapsule, DestObb, RetVec)){
+			SetHitTime(0);
+			SetHitObject(DestObj);
+		}
 	}
 
 	void CollisionCapsule::GetNormalClosetPointWithHitObject(const shared_ptr<GameObject>& DestObj, Vector3& Normal, Vector3& ClosestPoint){
@@ -2288,6 +2318,13 @@ namespace basedx11{
 			SetHitTime(HitTime);
 			SetHitObject(DestObj);
 		}
+		//回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec;
+		if (HitTest::SPHERE_OBB(DestSphere, SrcObb, RetVec)){
+			SetHitTime(0);
+			SetHitObject(DestObj);
+		}
 	}
 
 	void CollisionObb::CollisionWithCapsule(const shared_ptr<GameObject>& DestObj){
@@ -2317,6 +2354,13 @@ namespace basedx11{
 			//続いて残りも判定するが、最終的に、一番Before地点に近いオブジェクトが
 			//設定される
 			SetHitTime(HitTime);
+			SetHitObject(DestObj);
+		}
+		//回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		Vector3 RetVec;
+		if (HitTest::CAPSULE_OBB(DestCapsule, SrcObb, RetVec)){
+			SetHitTime(0);
 			SetHitObject(DestObj);
 		}
 	}
@@ -2364,6 +2408,12 @@ namespace basedx11{
 				SetHitTime(HitTime);
 				SetHitObject(DestObj);
 			}
+		}
+		//回転している場合などここまででヒット漏れする可能性がある
+		//その場合は現時点でのヒットとする
+		if (HitTest::OBB_OBB(SrcObb, DestObb)){
+			SetHitTime(0);
+			SetHitObject(DestObj);
 		}
 	}
 

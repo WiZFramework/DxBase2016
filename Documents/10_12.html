@@ -1,0 +1,188 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>１．更新補助</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>１１２．衝突判定の自己実装</h3>
+<h4>自動衝突判定の問題点</h4>
+　<b>CollisionSphereやCollisionObbコンポーネント</b>を実装することでゲームオブジェクトは衝突判定を行うようになります。<br />
+　しかし、例えば回転するオブジェクトが相手となる判定や、複数合体したオブジェクトが一緒に移動した状態での判定は、かなり甘いものになってしまいます。<br />
+　これは、
+<div class="box1">
+<pre>
+１、移動する物体の同じ形状（同じ回転角度）を維持したまま、前回ターン時の位置と、
+　　今回のターン時の位置を出して、その間の衝突を判定する
+２、1回のターンで衝突する相手は1個のみと限定
+</pre>
+</div>
+　という方式をとっているため、回転する場合は１、複数の合体オブジェクトの場合は２の問題が起きます。<br />
+　こんな場合は<b>衝突判定を自己実装</b>することで、回避できることが多いです。<br />
+　サンプル112を実行すると、以下のような画面が現れます。
+<p>&nbsp;</p>
+<img src="img/1012a.jpg" width="80%"/>
+<p>図1012a</p>
+<p>&nbsp;</p>
+　この画面はチュートリアル006を修正したものですが、右側のブロックに回転するブロックが乗っています。<br />
+　このブロックとの衝突判定は、自動判定ではうまくいきません。なぜなら、自動判定は、回転する物体に対しては対応してないからです。（上記１の問題）<br />
+　これを回避するために、回転するブロック用に<b>RollingBox</b>というクラスを作成し、そのインスタンスとプレイヤーの判定のみ、<b>自己実装</b>します。<br/>
+　<b>自己実装</b>といいましても、<b>SphereとObbの判定を作成する</b>わけではありません。判定そのものはライブラリにありますので、それを利用して、個別の衝突判定をおこないます。<br />
+　まず、<b>Charactor.h、cpp</b>に<b>RollingBoxクラス</b>を作成します。以下は、その<b>OnCreate()関数</b>です。
+<div class="box1">
+<pre>
+    void RollingBox::OnCreate(){
+        auto PtrTransform = AddComponent&lt;Transform>();
+
+        PtrTransform->SetScale(m_Scale);
+        PtrTransform->SetRotation(m_Rotation);
+        PtrTransform->SetPosition(m_Position);
+
+        <span class="red">//CollisionObbコンポーネントをつける
+        //これはOBBを取り出すためのみに使用
+        auto PtrObb = AddComponent&lt;CollisionObb>();
+        PtrObb->SetUpdateActive(false);</span>
+        AddComponent&lt;PNTCollisionDraw>();
+
+
+        //アクションの登録
+        auto PtrAction = AddComponent&lt;Action>();
+        //2秒で90度回転
+        PtrAction->AddRotateBy(2.0f, Vector3(0.0f, XM_PIDIV2, 0.0f));
+        //ループする
+        PtrAction->SetLooped(true);
+        //アクション開始
+        PtrAction->Run();
+
+        //影をつける
+        auto ShadowPtr = AddComponent&lt;Shadowmap>();
+        ShadowPtr->SetMeshResource(L"DEFAULT_CUBE");
+
+        auto PtrDraw = AddComponent&lt;PNTStaticDraw>();
+        PtrDraw->SetMeshResource(L"DEFAULT_CUBE");
+        PtrDraw->SetTextureResource(L"SKY_TX");
+        PtrDraw->SetOwnShadowActive(true);
+    }
+</pre>
+</div>
+　赤くなっているところが重要な部分です。自己判定するのにあたって、OBBを利用するわけですが、そのOBBを独自に作成するのは大変なので、OBB取り出しの目的だけに<b>CollisionObbコンポーネント</b>を実装します。判定には使用しないので、
+<div class="box1">
+<pre>
+        PtrObb->SetUpdateActive(false);
+</pre>
+</div>
+　としておきます。これで自動判定は行いません。このオブジェクトは回転するので、アクションコンポーネントで回転だけつけておきます。<br />
+<br/>
+<h4>プレイヤー側の処理</h4>
+　プレイヤー側では、<b>OnLastUpdate()関数</b>に自己判定を実装します。以下がそのコードです。
+<div class="box1">
+<pre>
+    //ターンの最終更新時
+    void Player::OnLastUpdate(){
+        
+        //回転するOBBは手動で衝突判定を行う
+        auto RollPtr = GetStage()->GetSharedGameObject&lt;RollingBox>(L"RollingBox");
+        auto CollObb = RollPtr->GetComponent&lt;CollisionObb>();
+        auto Obb = RollPtr->GetComponent&lt;CollisionObb>()->GetObb();
+        auto GraPtr = GetComponent&lt;Gravity>();
+        auto SpPtr = GetComponent&lt;CollisionSphere>();
+
+        auto Sp = GetComponent&lt;CollisionSphere>()->GetSphere();
+        //重力を取り出す
+        auto PtrGravity = GetComponent&lt;Gravity>();
+        Vector3 RetVec;
+        <span class="red">if (HitTest::SPHERE_OBB(Sp, Obb, RetVec)){</span>
+            //衝突した
+            if (SpPtr->CheckOnObjectBase(RollPtr)){
+                //OBBの上に乗っている
+                auto BaseY = Obb.m_Center.y + Obb.m_Size.y;
+                //重力の最下地点を設定
+                PtrGravity->SetBaseY(BaseY + 0.125f);
+                PtrGravity->SetOnObject(RollPtr);
+            }
+            else{
+                SpPtr->SetHitObject(RollPtr);
+                auto Velo = GetComponent&lt;Rigidbody>()->GetVelocity();
+                auto Rep = Sp.m_Center - RetVec;
+                Rep.Normalize();
+                Rep *= 5.0f;
+                GetComponent&lt;Rigidbody>()->SetVelocity(Rep);
+                //最下地点
+                PtrGravity->SetBaseY(0.125f);
+            }
+        }
+        else{
+            //最下地点
+            PtrGravity->SetBaseY(0.125f);
+        }
+
+        //中略
+
+    }
+</pre>
+</div>
+　この中で呼び出している<b>HitTest::SPHERE_OBB(Sp, Obb, RetVec)</b>が、ライブラリに含まれる<b>球とOBBの衝突判定</b>です、自動衝突判定は、内部でこの関数を呼び出しています。<br />
+　この関数は、OBBやSPHERE構造体（ボリューム境界を表す構造体）を使用しますので、この構造体を取り出すのに、<b>回転するオブジェクトのCollisionObb</b>を使用しているわけです。<br />
+　ライブラリにはこのほかに、<b>球対球、カプセル対球、OBB対OBB</b>などがあります。詳しくは、<b>ライブラリ内TransHelper.h</b>にあります、<b>HitTest構造体</b>のstatic関数を参照ください。<br />
+　また、ここでは、プレイヤーの<b>Gravity</b>を少しだまして、最下地点を調整することで、回転するオブジェクトの上に乗れるようにしています。<br />
+<div class="box1">
+<pre>
+                //重力の最下地点を設定
+                PtrGravity->SetBaseY(BaseY + 0.125f);
+</pre>
+</div>
+　の部分がそうです。<br />
+　また回転するオブジェクトに乗ったときにチュートリアル006のままだと、進行方向がずれてしまいます。そのため、<b>Player.cppの、Player::GetAngle()関数</b>を以下のように修正しています。
+<div class="box1">
+<pre>
+    //移動の向きを得る
+    Vector3 Player::GetAngle(){
+        Vector3 Angle(0, 0, 0);
+        //コントローラの取得
+        auto CntlVec = App::GetApp()->GetInputDevice().GetControlerVec();
+        if (CntlVec[0].bConnected){
+            if (CntlVec[0].fThumbLX != 0 && CntlVec[0].fThumbLY != 0){
+                //中略
+
+                <span class="red">auto OnObj = GraPtr->GetOnObject();
+                if (OnObj){
+                    auto OnRot = OnObj->GetComponent&lt;Transform>()->GetRotation();
+                    TotalAngle += OnRot.y;
+                }</span>
+                //中略
+
+            }
+        }
+        return Angle;
+    }
+</pre>
+</div>
+　この処理により、回転している物体の上でも違和感なくコントローラで移動できます。<br />
+<br/>
+　ここで説明した<b>衝突判定の自己実装</b>はあくまで例にすぎません。相手のオブジェクトの動きや形状によっては、もっと違った処理が必要になる場合があります。<br />
+　それらはゲームそれぞれによって違いますので、各ゲームごとに考える必要があるでしょう。
+
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="10_11.html">前ページ</a></li>
+<li><a href="index.html">目次</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

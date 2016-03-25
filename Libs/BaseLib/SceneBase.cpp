@@ -311,6 +311,14 @@ namespace basedx11{
 		}
 	}
 
+	void GameObject::CollisionReset(){
+		auto CollisionPtr = GetComponent<Collision>(false);
+		if (CollisionPtr) {
+			CollisionPtr->ResetHitObject();
+		}
+	}
+
+
 	void GameObject::DrawShadowmap(){
 		auto shadowptr = GetDynamicComponent<Shadowmap>(false);
 		if (shadowptr){
@@ -1673,6 +1681,17 @@ namespace basedx11{
 		if (IsUpdateActive()){
 			OnLastUpdate();
 		}
+
+		//コリジョンのリセット
+		for (auto ptr : GetGameObjectVec()){
+			ptr->CollisionReset();
+		}
+		//自身のコリジョンのリセット
+		if (IsUpdateActive()){
+			CollisionReset();
+		}
+		
+
 		//子供ステージの更新
 		for (auto PtrChileStage : GetChileStageVec()){
 			PtrChileStage->UpdateStage();

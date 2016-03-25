@@ -437,7 +437,6 @@ namespace basedx11{
 	//--------------------------------------------------------------------------------------
 	class Collision : public Component {
 		friend class Gravity;
-		void ResetHitObject();
 		bool IsNewDest() const;
 		bool NeedAfterCollision() const;
 		bool NeedSendEvent() const;
@@ -501,6 +500,7 @@ namespace basedx11{
 		shared_ptr<GameObject> GetHitObject() const;
 		void SetHitObject(const shared_ptr<GameObject>& Ptr);
 
+		void ResetHitObject();
 		void ClearBothHitObject();
 
 		shared_ptr<GameObject> GetSubDispatchObject() const;

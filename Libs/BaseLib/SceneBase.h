@@ -976,6 +976,7 @@ namespace basedx11{
 		//コンポーネント操作
 		void ComponentUpdate();
 		void ComponentUpdate2();
+		void CollisionReset();
 		void DrawShadowmap();
 		void ComponentDraw();
 
