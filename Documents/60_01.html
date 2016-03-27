@@ -1,0 +1,279 @@
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="css/main.css" rel="stylesheet" type="text/css">
+<title>DxBase2016ドキュメント(2016年)</title>
+</head>
+<body>
+<!-- 全体コンテナ　-->
+<div id="container">
+<div id="header">
+<h2>６．行列の直接操作</h2>
+</div>
+<!-- コンテンツ　-->
+<div id="contents">
+<br/>
+<h3>６０１．衝突判定の基本</h3>
+<br />
+　６章は<b>行列の直接操作</b>について、独立した章立てで説明します。<br />
+　DxBase2016では、<b>自動衝突判定や自動物理計算、重力など</b>が実装されています。<b>Rigidbody</b>や<b>CollisionSphere</b>などのコンポーネントがそれです。<b>Steering系のコンポーネント</b>もそうでしょう。これらのコンポーネントを、<b>Transformコンポーネント</b>が実装されたときに実装すると、自動計算を行うようになります。<br />
+　DxBase2016に限らず、現在のゲームエンジン（ミドルウェア）は、そういった自動計算をしてくれるのが一般的ですが、この自動実装に慣れてしまうと、<b>ゲームプログラミングの本質</b>を見誤ることも多くなります。<br />
+　たとえば、思い通りの動きにならないときに、どうしても<b>パラメータの変更</b>に頼ることになります。このような対応でうまくいく場合もありますが、実は、そのパラメータの意味することの見誤り（結果として思い通りになったとしても、たまたまそうなっているに過ぎない場合）や、エンジンそのものの不具合（あるいは隠された仕様）によって、計算がうまくいかない場合など、フレームワークやミドルウェアに頼りすぎる結果、大きな不具合を生むことも多いでしょう。<br />
+　そこで、この章では、<b>ゲームプログラミング</b>の基本に立ち返るためにも、もう一度<b>更新処理</b>について説明したいと思います。<br />
+　<b>更新処理</b>で一番重要なのは<b>行列の操作</b>です。カメラやライトも行列を多用します。<br />
+<br />
+　この項ではまず、<b>衝突判定の基本</b>について述べます。また<b>Transformコンポーネント</b>を使わずに<b>TransformMatrixコンポーネント</b>を使うことで実装していきたいと思います。<br />
+　フレームワークの<b>自動衝突判定</b>は万能ではありません。また、<b>サンプル112衝突判定の自己実装</b>でも述べたように回転するオブジェクトではうまく機能しません。<br />
+　また、DxBase2016に実装されている衝突判定は<b>ゲームプログラミングのためのリアルタイム衝突判定（ChristerEricson著）</b>を参考に実装されています。この本は丸ごと1冊衝突判定について記された本です。ぜひ読んでみてください。<br />
+<br />
+<h4>境界ボリューム</h4>
+　衝突判定を実装するにあたって、一般的には、ゲーム上にある各オブジェクトを<b>単純な形状</b>に置き換えて実装します。球や直方体、カプセル型などです<br />
+　これらの形状は<b>境界ボリューム</b>といいます。<b>直方体</b>の<b>境界ボリューム</b>は<b>OBB</b>といい、OBBの中で、特にXYZ各軸に平行な形状を<b>AABB</b>といいます。<br />
+　DxBase2016に実装されている衝突判定はこの<b>境界ボリューム</b>を使ったものであり、またサンプルのほとんどはこれらの<b>境界ボリューム</b>をプリミティブで表示させるものです。<br />
+　実際のゲームでは、モデルやSpriteStdioなどの2Dアニメーションで表現されるものもあると思いますが、衝突判定に関しては、これらの<b>境界ボリューム</b>を使用します。<br />
+<br />
+<h4>境界ボリューム同士の衝突</h4>
+　衝突判定は<b>境界ボリューム同士の衝突</b>を実装することで行います。例えば、OBBと球、OBBとOBB、OBBとカプセルなどです。<br />
+　これらの<b>境界ボリューム同士の衝突</b>を0から実装するのは、とっても大変です。そのためフレームワークでは、それらの<b>境界ボリューム同士の衝突</b>を検知する関数を持っています。便宜上、これらの関数を<b>衝突判定のコア関数</b>と呼びます。ゲームでの衝突判定はこれらのコア関数を呼び出して<b>衝突してるかしてないか</b>を判別するのが基本です。<br />
+<br />
+<h4>衝突判定のコア関数による検知</h4>
+　サンプル601を起動して実行してみましょう。すると以下のような画面が出てきます。
+<p>&nbsp;</p>
+<img src="img/6001a.jpg" width="80%"/>
+<p>図6001a</p>
+<p>&nbsp;</p>
+　右側の球体が左の直方体（OBB）に近づいてきます。やがて2つは衝突し、球体が逆に移動します。<br />
+　この衝突判定は、<b>衝突判定のコア関数</b>を使用して実装しています。球体（MoveSphere）の<b>OntUpdate()関数</b>でそれを実装してます。(Charactor.cppにあります)
+<div class="box1">
+<pre>
+    //更新
+    void MoveSphere::OnUpdate(){
+        //行き過ぎた場合の対応
+        if (m_Posision.x > m_StartPosision.x){
+            m_Posision = m_StartPosision;
+            m_Velocity.x = -1.0f;
+        }
+
+        float ElapsedTime = App::GetApp()->GetElapsedTime();
+        auto Span = m_Velocity * ElapsedTime;
+        m_Posision += Span;
+
+        //Boxを取得
+        auto BoxPtr = GetStage()->GetSharedGameObject&lt;Box>(L"Box");
+        auto BoxMat = BoxPtr->GetComponent&lt;TransformMatrix>()->GetWorldMatrix();
+        OBB BoxObb(Vector3(1.0f, 1.0f, 1.0f), BoxMat);
+        SPHERE Sp(m_Posision, m_Scale.x / 2.0f);
+        Vector3 RetVec;
+        if (<span class="red">HitTest::SPHERE_OBB(Sp, BoxObb, RetVec)</span>){
+            //衝突した
+            m_Velocity.x = 1.0f;
+        }
+        auto PtrTransformMatrix = GetComponent&lt;TransformMatrix>();
+        Matrix4X4 mat;
+        mat.DefTransformation(
+            m_Scale,
+            Vector3(0.0f, 0.0f, 0.0f),
+            m_Posision
+            );
+
+        PtrTransformMatrix->SetWorldMatrix(mat);
+
+    }
+</pre>
+</div>
+　衝突の検証は、両方のオブジェクトで行う必要はありません。ここでは、移動する側で検証し、止まっているほうでは実装しません。両方に実装した場合は、どちらか側からの検証が済んだら、もう一方側からの検証は行わなく済むよう、検証済みフラグなどで管理するのが良いでしょう。もしくは、判定マネージャクラスのようなクラスを作成し、そこで多対多の判定を行う方法もあります。<br />
+　赤くなっているところが、コア関数を呼び出しているところです。ここでは、<b>球とOBB</b>の判定を行っています。<br />
+　コア関数は<b>HitTest構造体</b>に<b>static関数</b>として実装されています。<br />
+　<b>HitTest::SPHERE_OBB()関数</b>の引数は、1番目が<b>球体データ</b>、2番目が<b>OBBデータ</b>、3番目は<b>最近接点を代入するベクトル</b>を渡します。<br />
+　<b>衝突判定のコア関数</b>は<b>SPHEREやOBB</b>といった、<b>境界ボリュームを表すデータ（構造体になっています）</b>を渡します。<br />
+　ここでは、<b>BoxObb、Sp</b>というインスタンスで作成しています。<br />
+<br/>
+<h4>境界ボリュームを表すデータ</h4>
+　<b>境界ボリュームを表すデータ</b>の作成方法は、形状によってまちまちです。構造体なので直接代入することもできます。<br />
+　まず、<b>SPHERE</b>ですが、以下がその構造体です。
+<div class="box1">
+<pre>
+struct SPHERE : public CollisionVolume
+{
+    Vector3 m_Center;   //中心点の座標
+    float m_Radius;         //半径
+    SPHERE(){}
+    SPHERE(const Vector3& Center,float Radius):
+        m_Center(Center),
+        m_Radius(Radius){}
+    bool operator==(const SPHERE& other)const{
+        return ((m_Center == other.m_Center) && (m_Radius == other.m_Radius));
+    }
+};
+</pre>
+</div>
+　<b>２つのコンストラクタとoperator==</b>がありますが、データの実体は、<b>中心点と半径</b>だけです。球ですので、この2つで表現できます。親クラスの<b>CollisionVolume</b>は他の境界ボリュームと関連づけるため存在します。共通のインターフェイスとして使用します（こうしておくと、違う境界ボリューム同士を1つの配列などにまとめやすくなります）。<br />
+　そして、以下が<b>OBB</b>です。球に比べてちょっと複雑です。
+<div class="box1">
+<pre>
+struct OBB : public CollisionVolume{
+    Vector3 m_Center;     //中心点の座標
+    Vector3 m_Rot[3];  //XYZ の各座標軸の傾きを表す方向ベクトル
+    Vector3 m_Size;     //OBB の各座標軸に沿った長さの半分（中心点から面までの長さ）
+    OBB(){
+        //デフォルトは1辺1.0のOBB
+        Vector3 SizeVec(1.0f,1.0f,1.0f);
+        //行列はアイデンティティ
+        Matrix4X4 Matrix;
+        CreateOBB(SizeVec,Matrix);
+    }
+    //作成されたサイズと変換行列から、OBBを得る
+    OBB(const Vector3& Size,const Matrix4X4& Matrix)
+    {
+        m_Center.x = Matrix._41;
+        m_Center.y = Matrix._42;
+        m_Center.z = Matrix._43;
+        Vector3 VecX(Matrix._11,Matrix._12,Matrix._13);
+        Vector3 VecY(Matrix._21,Matrix._22,Matrix._23);
+        Vector3 VecZ(Matrix._31,Matrix._32,Matrix._33);
+        m_Size = Vector3(
+            Size.x * VecX.Length(),
+            Size.y * VecY.Length(),
+            Size.z * VecZ.Length()
+            );
+        m_Size *= 0.5f;
+        //回転を得る
+        m_Rot[0] = Vector3EX::Normalize(VecX);
+        m_Rot[1] = Vector3EX::Normalize(VecY);
+        m_Rot[2] = Vector3EX::Normalize(VecZ);
+
+    }
+    //中略
+};
+</pre>
+</div>
+　上記に紹介したコンストラクタの他に、いくつかのメンバ関数もありますが、省略します。各自確認してください。<br />
+　<b>OBB</b>は直方体です。３Ｄ上に表現される直方体が必要なのは、x、y、zそれぞれの辺のサイズと、傾き、そして位置情報です。それを
+<div class="box1">
+<pre>
+struct OBB : public CollisionVolume{
+    Vector3 m_Center;     //中心点の座標
+    Vector3 m_Rot[3];  //XYZ の各座標軸の傾きを表す方向ベクトル
+    Vector3 m_Size;     //OBB の各座標軸に沿った長さの半分（中心点から面までの長さ）
+};
+</pre>
+</div>
+　という形で表現します。<b>m_Centerとm_Size</b>は、直感的に理解できると思います。問題は<b>m_Rot[3]</b>かと思います。これは、各軸がどのくらい傾いているか、を表します。<br />
+<br/>
+<h4>OBBとワールド行列</h4>
+　これを説明するのに、すこし、ワールド行列について考えてみましょう。<br />
+　<b>ワールド行列</b>には、スケーリング、回転、平行移動の各値が計算しやすいような形に変換されて入っているデータと考えられます。以下は<b>Matrix4X4の親クラスであるXMFLOAT4X4型</b>の内容です（抜粋）。
+<div class="box1">
+<pre>
+struct XMFLOAT4X4
+{
+    union
+    {
+        struct
+        {
+            float _11, _12, _13, _14;
+            float _21, _22, _23, _24;
+            float _31, _32, _33, _34;
+            float _41, _42, _43, _44;
+        };
+        float m[4][4];
+    };
+    //中略
+};
+</pre>
+</div>
+　4X4行列は、float型のデータが16個あります。それぞれ変数名がついていて、<b>_11, _12, _13, _14...</b>のようになっています。このデータはunionになっていますので、<b>m[4][4]</b>の配列として認識することも可能です。<br />
+　さて、<b>ワールド行列</b>はここに値が入っているわけですが、それぞれ意味があります。<br />
+　まず、位置情報は、<b>_41, _42, _43</b>にあります。それぞれX座標、Y座標、Z座標です。<br />
+　スケーリングは<b>_11, _12, _13のベクトルの長さがXスケールの長さ</b>という感じです<br />
+<div class="box1">
+<pre>
+X軸スケール = Vector3EX::Length(Vector3(_11, _12, _13));
+Y軸スケール = Vector3EX::Length(Vector3(_21, _22, _23));
+Z軸スケール = Vector3EX::Length(Vector3(_31, _32, _33));
+</pre>
+</div>
+　という形で求められます。<br />
+　回転は、スケーリング同様<b>_11, _12, _13, _21, _22, _23, _31, _32, _33</b>に入ってるわけですが、直接入っているわけではありません。入っている値は、<b>（X軸の）回転角度</b>のような値が入ってるのではなく、<b>（ローカルX軸は）どのくらい回転しているか（つまり回転後の値）</b>が入ってます。<br />
+　これを計算で表しますと、
+<div class="box1">
+<pre>
+ローカルX軸の回転結果 = Vector3EX::Normalize(Vector3(_11, _12, _13));
+ローカルY軸の回転結果 = Vector3EX::Normalize(Vector3(_21, _22, _23));
+ローカルZ軸の回転結果 = Vector3EX::Normalize(Vector3(_31, _32, _33));
+</pre>
+</div>
+　となります。<br />
+　さて、ここでOBBに話を戻します。OBBに入っている<b>m_Rot[3]</b>は、まさしく、ワールド行列の<b>ローカルX,Y,Z軸の回転結果
+</b>に他なりません。そのため、OBBは、ワールド行列ととっても相性が良いのです。<br />
+　そこで、OBBのコンストラクタ（行列をもとに作成するコンストラクタ）をもう一度見てみましょう。
+<div class="box1">
+<pre>
+    //作成されたサイズと変換行列から、OBBを得る
+    OBB(const Vector3& Size,const Matrix4X4& Matrix)
+    {
+        m_Center.x = Matrix._41;
+        m_Center.y = Matrix._42;
+        m_Center.z = Matrix._43;
+        Vector3 VecX(Matrix._11,Matrix._12,Matrix._13);
+        Vector3 VecY(Matrix._21,Matrix._22,Matrix._23);
+        Vector3 VecZ(Matrix._31,Matrix._32,Matrix._33);
+        m_Size = Vector3(
+            Size.x * VecX.Length(),
+            Size.y * VecY.Length(),
+            Size.z * VecZ.Length()
+            );
+        m_Size *= 0.5f;
+        //回転を得る
+        m_Rot[0] = Vector3EX::Normalize(VecX);
+        m_Rot[1] = Vector3EX::Normalize(VecY);
+        m_Rot[2] = Vector3EX::Normalize(VecZ);
+
+    }
+</pre>
+</div>
+　コンストラクタに渡される<b>const Vector3& Size</b>は、作成されたときのサイズです。通常は、各値1.0の立方体として作成しますが、ここでは指定することもできます。サンプルでは、メッシュに<b>L"DEFAULT_CUBE"</b>を使ってますので、これに合わせ、各値1.0の立方体としてます。<b>const Matrix4X4& Matrix</b>はワールド行列です。さきほど説明した行列から各値を取り出す方法で、<b>m_Center,m_Size,m_Ro[3]</b>を初期化します。<br />
+<br />
+　サンプルでは、このようにして作成した球体（SPHERE）とOBBをコア関数によって検証します。<br />
+　衝突していれば、移動スピード<b>m_Velocity</b>の値を変更し、その値をもとに移動のアニメーションを動的に作成します。<br />
+　コア関数<b>HitTest::SPHERE_OBB()</b>に渡す3番目の引数は、<b>最近接点</b>を取得するのに使用します。ここでは使ってませんが、衝突した時の反発方向を計算するのに使用できます。<br />
+<br />
+<h4>コア関数の問題点</h4>
+　一見、この記述で問題ないようですが、例えば<b>MoveSphere::OnUpdate()</b>をちょっと書き換えて実行してみましょう。
+<div class="box1">
+<pre>
+    void MoveSphere::OnUpdate(){
+        //行き過ぎた場合の対応
+        if (m_Posision.x > m_StartPosision.x){
+            m_Posision = m_StartPosision;
+            m_Velocity.x = <span class="red">-50.0f</span>;
+        }
+
+        //中略
+
+    }
+</pre>
+</div>
+　書き換えるところは、赤くなっているところ（右に行き過ぎた時に戻る処理）です。速度を設定してますが、ここに<b>-50.0f</b>を設定します。すると、最初の行き来はいいのですが、右方向限界まで行ったときに、球にスピードが変わります。その状態のまま、ボックスに突っ込むわけですが、かなりBoxに食い込んだところで反射しているのがわかります。<br />
+　そして例えば、<b>-50.0f</b>を<b>-100.0f</b>にしてみましょう。この値だと、もう、ボックスとは衝突しません。<br />
+　通り過ぎて、球はどこか遠くに行ってしまいます。<br />
+<br />
+　この現象を<b>トンネル現象</b>といいます。<br/>
+　現実環境では、<b>物体が飛び飛びで存在する</b>ことはありえないのですが、ゲーム上はあくまで、<b>アニメーションの一コマ</b>としてターン毎に計算しているので、動きが速くなると、すり抜けてしまうのです。<br />
+　この現象を回避する方法を次項で述べます。<br />
+<br />
+</div>
+<!-- /コンテンツ　-->
+<hr>
+<!-- フッタ　-->
+<ul class="foot_navi">
+<li><a href="index.html">目次</a></li>
+<li><a href="60_02.html">次ページ</a></li>
+</ul>
+<!-- /フッタ　-->
+
+
+</div>
+<!-- /全体コンテナ　-->
+</body>
+</html>

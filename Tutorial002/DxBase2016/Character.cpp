@@ -27,12 +27,12 @@ namespace basedx11{
 		PtrTransMatrix->SetWorldMatrix(WorldMat);
 		//影をつける
 		auto ShadowPtr = AddComponent<Shadowmap>();
-		ShadowPtr->SetMeshResource(L"DEFAULT_CYLINDER");
+		ShadowPtr->SetMeshResource(L"DEFAULT_CUBE");
 
 		
 		//描画コンポーネント
 		auto PtrDraw = AddComponent<PNTStaticDraw>();
-		PtrDraw->SetMeshResource(L"DEFAULT_CYLINDER");
+		PtrDraw->SetMeshResource(L"DEFAULT_CUBE");
 		PtrDraw->SetTextureResource(L"TRACE_TX");
 
 		
